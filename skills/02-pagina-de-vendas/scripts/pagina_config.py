@@ -34,6 +34,14 @@ def main(argv: "list[str] | None" = None) -> int:
         args = ap.parse_args(argv)
     except SystemExit as s:
         return int(s.code or 0)
+    try:
+        return _executar(args)
+    except KeyboardInterrupt:
+        print("Cancelado.", file=sys.stderr)
+        return 130
+
+
+def _executar(args) -> int:
 
     if args.paletas:
         for chave, rotulo in PALETAS_ROTULO.items():
@@ -52,8 +60,11 @@ def main(argv: "list[str] | None" = None) -> int:
             novos[chave.strip()] = validar_valor(chave.strip(), valor)
         if args.head_arquivo:
             try:
-                novos["head_html"] = Path(args.head_arquivo).read_text(encoding="utf-8")
-            except OSError as e:
+                arq = Path(args.head_arquivo)
+                if arq.stat().st_size > 100 * 1024:
+                    raise ValueError("O código do <head> passou de 100 KB — confira se colou o arquivo certo.")
+                novos["head_html"] = arq.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError) as e:
                 raise ValueError(f"Não consegui ler {args.head_arquivo} ({type(e).__name__}).") from e
     except ValueError as e:
         print(f"❌ {e}", file=sys.stderr)

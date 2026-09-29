@@ -15,9 +15,14 @@ _HOME = os.environ.get("MAQUINA_HOME") or os.path.expanduser("~/.maquina")
 if _HOME not in sys.path:
     sys.path.append(_HOME)
 
-from nucleo.chaves import obter_chave  # noqa: E402
-from nucleo.erros import MaquinaErro, registrar_log  # noqa: E402
-from nucleo.netlify import publicar_pasta  # noqa: E402
+try:
+    from nucleo.chaves import obter_chave  # noqa: E402
+    from nucleo.erros import MaquinaErro, registrar_log  # noqa: E402
+    from nucleo.netlify import publicar_pasta  # noqa: E402
+    NUCLEO_OK = True
+except ImportError:
+    NUCLEO_OK = False
+    MaquinaErro = RuntimeError
 
 from pagina_conteudo import ler_config, normalizar, salvar_config  # noqa: E402
 
@@ -51,7 +56,10 @@ def publicar(pasta_projeto: Path) -> dict:
     config = ler_config(pagina)
     resultado = publicar_pasta(token, site, config.get("site_id") or None)
     config["site_id"], config["url"] = resultado["site_id"], resultado["url"]
-    salvar_config(pagina, config)
+    try:
+        salvar_config(pagina, config)
+    except OSError:
+        resultado = dict(resultado, aviso_config=True)
     return resultado
 
 
@@ -62,6 +70,10 @@ def main(argv: "list[str] | None" = None) -> int:
         args = ap.parse_args(argv)
     except SystemExit as s:
         return int(s.code or 0)
+    if not NUCLEO_OK:
+        print("❌ A Máquina não está instalada direito (não achei o núcleo). Rode o instalar.sh de novo.",
+              file=sys.stderr)
+        return 1
     site = Path(args.projeto) / "pagina" / "site"
     try:
         r = publicar(Path(args.projeto))
@@ -78,11 +90,19 @@ def main(argv: "list[str] | None" = None) -> int:
     except MaquinaErro as e:
         print(f"❌ {e}", file=sys.stderr)
         return 1
+    except KeyboardInterrupt:
+        print("Cancelado.", file=sys.stderr)
+        return 130
     except Exception:
-        registrar_log(traceback.format_exc())
+        try:
+            registrar_log(traceback.format_exc())
+        except Exception:
+            pass
         print("❌ Algo deu errado ao publicar. Detalhes no log da Máquina (~/.maquina/log).", file=sys.stderr)
         return 1
     print(f"✅ No ar: {r['url']}")
+    if r.get("aviso_config"):
+        print(f"⚠️ Não consegui salvar o endereço no config.json (site_id {r['site_id']}) — anote esse link.")
     return 0
 
 

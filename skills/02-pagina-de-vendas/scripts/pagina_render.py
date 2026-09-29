@@ -310,7 +310,10 @@ def _montar(pagina, conteudo, config, avisos, site, novo):
     index.write_text(render_html(conteudo, config, imagens, date.today().year), encoding="utf-8")
     antigo = pagina / ".site-antigo"
     if antigo.exists():
-        shutil.rmtree(antigo)
+        if not site.exists():
+            antigo.rename(site)  # sobrou de uma queda entre os renames: recupera
+        else:
+            shutil.rmtree(antigo)
     tinha_antigo = site.exists()
     if tinha_antigo:
         site.rename(antigo)
@@ -318,7 +321,10 @@ def _montar(pagina, conteudo, config, avisos, site, novo):
         novo.rename(site)
     except BaseException:
         if tinha_antigo:
-            antigo.rename(site)
+            try:
+                antigo.rename(site)
+            except OSError:
+                pass
         raise
     if tinha_antigo:
         shutil.rmtree(antigo, ignore_errors=True)
