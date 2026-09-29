@@ -60,3 +60,12 @@ def test_salvar_arquivo_preexistente_0644_termina_0600(ambiente):
 def test_valor_com_igual_faz_ida_e_volta(ambiente):
     chaves.salvar_chave("KIE_API_KEY", "abc==def=")
     assert chaves.ler_chaves()["KIE_API_KEY"] == "abc==def="
+
+
+def test_salvar_remove_tmp_orfaos(ambiente):
+    chaves.salvar_chave("KIE_API_KEY", "a")
+    velho = chaves.arquivo_chaves().parent / ".chaves.env.deadbeef.tmp"
+    velho.write_text("lixo")
+    chaves.salvar_chave("KIE_API_KEY", "b")
+    assert not velho.exists()
+    assert chaves.ler_chaves() == {"KIE_API_KEY": "b"}

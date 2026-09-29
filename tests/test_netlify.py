@@ -157,3 +157,22 @@ def test_404_vira_site_nao_existe(monkeypatch):
     with pytest.raises(netlify.NetlifySiteNaoExiste, match="não existe mais"):
         netlify._requisitar("POST", "/sites/x/deploys", "t")
     assert issubclass(netlify.NetlifySiteNaoExiste, netlify.NetlifyErro)
+
+
+def test_publicar_site_apagado_cria_novo_e_devolve_novo_id(tmp_path, monkeypatch):
+    (tmp_path / "index.html").write_text("x")
+    chamadas = []
+
+    def falso(metodo, caminho, token, corpo=None, tipo="application/json"):
+        chamadas.append((metodo, caminho))
+        if caminho == "/sites/velho/deploys":
+            raise netlify.NetlifySiteNaoExiste("sumiu")
+        if caminho == "/sites":
+            return {"id": "novo"}
+        return {"ssl_url": "https://novo.netlify.app"}
+
+    monkeypatch.setattr(netlify, "_requisitar", falso)
+    r = netlify.publicar_pasta("t", tmp_path, site_id="velho")
+    assert r == {"site_id": "novo", "url": "https://novo.netlify.app"}
+    assert chamadas == [("POST", "/sites/velho/deploys"), ("POST", "/sites"),
+                        ("POST", "/sites/novo/deploys")]

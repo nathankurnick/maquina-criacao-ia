@@ -46,9 +46,14 @@ def _requisitar(url: str, chave: str, dados: "dict | None" = None) -> dict:
 
 
 def _checar(d: dict) -> dict:
-    if d.get("code") != 200:
-        raise KieErroPermanente(f"A KIE recusou o pedido: {d.get('msg') or d}. Confira a chave e os créditos.")
-    return d
+    codigo = d.get("code")
+    if codigo == 200:
+        return d
+    if isinstance(codigo, int) and (codigo in (429, 455) or (codigo >= 500 and codigo != 501)):
+        raise KieErro("A KIE está instável ou ocupada agora. Tente de novo em alguns minutos.")
+    if codigo == 402:
+        raise KieErroPermanente("Seus créditos da KIE acabaram. Recarregue em https://kie.ai e tente de novo.")
+    raise KieErroPermanente(f"A KIE recusou o pedido: {d.get('msg') or d}. Confira a chave e os créditos.")
 
 
 INESPERADA = "A KIE devolveu uma resposta inesperada. Tente de novo em alguns minutos."

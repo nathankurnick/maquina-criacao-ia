@@ -242,3 +242,29 @@ def test_baixar_fala_arquivo(monkeypatch, tmp_path):
     monkeypatch.setattr(kie.urllib.request, "urlopen", falha)
     with pytest.raises(kie.KieErro, match="O arquivo foi gerado"):
         kie.baixar("http://x/i.png", tmp_path / "i.png")
+
+
+def test_aguardar_codigo_transitorio_no_corpo_depois_sucesso(monkeypatch):
+    seq = iter([{"code": 455, "msg": "manutenção"},
+                {"code": 200, "data": {"state": "success", "resultJson": '{"a": 1}'}}])
+    monkeypatch.setattr(kie, "_requisitar", lambda url, chave, dados=None: next(seq))
+    assert kie.aguardar("k", "t1", intervalo=0, dormir=lambda s: None) == {"a": 1}
+
+
+@pytest.mark.parametrize("codigo", [429, 455, 500, 502, 503])
+def test_checar_codigos_transitorios(codigo):
+    with pytest.raises(kie.KieErro, match="instável") as ei:
+        kie._checar({"code": codigo})
+    assert not isinstance(ei.value, kie.KieErroPermanente)
+
+
+@pytest.mark.parametrize("codigo", [401, 404, 422, 501, 418])
+def test_checar_codigos_permanentes(codigo):
+    with pytest.raises(kie.KieErroPermanente):
+        kie._checar({"code": codigo})
+
+
+def test_aguardar_402_sem_creditos_e_permanente(monkeypatch):
+    monkeypatch.setattr(kie, "_requisitar", lambda url, chave, dados=None: {"code": 402, "msg": "x"})
+    with pytest.raises(kie.KieErroPermanente, match="créditos da KIE acabaram.*https://kie.ai"):
+        kie.aguardar("k", "t1", intervalo=0, dormir=lambda s: None)

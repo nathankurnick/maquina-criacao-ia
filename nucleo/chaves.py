@@ -49,11 +49,15 @@ def salvar_chave(nome: str, valor: str) -> None:
     arq = arquivo_chaves()
     arq.parent.mkdir(parents=True, exist_ok=True)
     os.chmod(arq.parent, 0o700)
+    for velho in arq.parent.glob(f".{arq.name}.*.tmp"):
+        velho.unlink(missing_ok=True)
     tmp = arq.with_name(f".{arq.name}.{uuid.uuid4().hex}.tmp")
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write("".join(f"{k}={v}\n" for k, v in dados.items()))
+            f.flush()
+            os.fsync(f.fileno())
         os.replace(tmp, arq)
     except BaseException:
         tmp.unlink(missing_ok=True)

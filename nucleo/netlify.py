@@ -82,14 +82,32 @@ def _zipar(pasta: Path) -> bytes:
     return buf.getvalue()
 
 
+def _criar_site(token: str) -> str:
+    site_id = _requisitar("POST", "/sites", token, b"{}").get("id")
+    if not site_id:
+        raise NetlifyErro(INESPERADA)
+    return site_id
+
+
 def publicar_pasta(token: str, pasta: Path, site_id: "str | None" = None) -> dict:
+    """Publica a pasta e devolve {"site_id", "url"}.
+
+    IMPORTANTE: se o site_id informado foi apagado na Netlify, um site novo é criado e o
+    site_id devolvido é DIFERENTE do recebido. Quem chama deve sempre salvar o site_id devolvido.
+    """
     if not (pasta / "index.html").exists():
         raise NetlifyErro(f"Não achei o index.html em {pasta}. Gere a página antes de publicar.")
-    if not site_id:
-        site_id = _requisitar("POST", "/sites", token, b"{}").get("id")
-        if not site_id:
-            raise NetlifyErro(INESPERADA)
-    deploy = _requisitar("POST", f"/sites/{site_id}/deploys", token, _zipar(pasta), "application/zip")
+    zip_bytes = _zipar(pasta)
+    criado = not site_id
+    if criado:
+        site_id = _criar_site(token)
+    try:
+        deploy = _requisitar("POST", f"/sites/{site_id}/deploys", token, zip_bytes, "application/zip")
+    except NetlifySiteNaoExiste:
+        if criado:
+            raise
+        site_id = _criar_site(token)
+        deploy = _requisitar("POST", f"/sites/{site_id}/deploys", token, zip_bytes, "application/zip")
     url = deploy.get("ssl_url") or deploy.get("url")
     if not url:
         raise NetlifyErro(INESPERADA)

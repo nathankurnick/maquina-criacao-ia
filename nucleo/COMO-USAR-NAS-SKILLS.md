@@ -32,7 +32,10 @@ preco, entregaveis[], bonus[], garantia, link_checkout, paleta` + corpo livre.
   um timeout explícito no Bash, e salvar o resultado de cada item assim que ele terminar
   (não só no fim do lote).
 - `KieErroPermanente` significa que repetir não adianta (chave, pedido ou tarefa recusados);
-  qualquer outro `KieErro` é transitório. `NetlifySiteNaoExiste` significa que o site foi
-  apagado: crie um novo (`publicar_pasta` sem `site_id`).
+  qualquer outro `KieErro` é transitório.
+- `publicar_pasta(token, pasta, site_id)` devolve `{"site_id", "url"}`. Se o site salvo foi apagado
+  na Netlify, ele cria um novo sozinho e o `site_id` devolvido pode ser DIFERENTE: a skill deve
+  sempre salvar o `site_id` devolvido.
+- Item que começa com "-" precisa vir depois de `--`, ex.: `maquina oferta adicionar p bonus -- "-50% no combo"`.
 - A publicação na Netlify envia só arquivos web (html, css, js, imagens, fontes, vídeos, pdf);
   `conteudo.json` e arquivos ocultos nunca vão.
