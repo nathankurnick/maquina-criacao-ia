@@ -53,6 +53,8 @@ def ler_meta(pasta: Path) -> dict:
         bruto = json.loads(arq.read_text(encoding="utf-8"))
     except FileNotFoundError as err:
         raise ValueError(f"Não achei {arq}. Crie o meta.json do entregável (titulo, tipo…).") from err
+    except UnicodeDecodeError as err:
+        raise ValueError(f"O {arq} não está em UTF-8. Abra e salve o arquivo como UTF-8.") from err
     except (OSError, ValueError) as err:
         raise ValueError(f"O {arq} tem um erro de formatação ({type(err).__name__}). Corrija e rode de novo.") from err
     if not isinstance(bruto, dict) or not str(bruto.get("titulo") or "").strip():
@@ -103,24 +105,34 @@ def montar_html(meta: dict, markdown: str, paleta_nome: str, capa_img: str = "")
             f"</head>\n<body>\n{corpo}\n</body>\n</html>\n")
 
 
+def _salvar_pdf(pg, opcoes: dict) -> None:
+    pg.pdf(**opcoes)
+
+
 def gerar(pasta: Path, paleta_nome: str, carrossel: "Path | None" = None) -> dict:
     from playwright.sync_api import sync_playwright
 
-    pasta = Path(pasta)
+    pasta = Path(pasta).resolve()
     meta = ler_meta(pasta)
     md_arq = pasta / "conteudo.md"
     if not md_arq.exists():
         raise ValueError(f"Não achei {md_arq}. Escreva o conteúdo do entregável antes de gerar o PDF.")
     capa = "capa.png" if (pasta / "capa.png").exists() and meta["tipo"] != "slides" else ""
-    documento = montar_html(meta, md_arq.read_text(encoding="utf-8"), paleta_nome, capa)
+    try:
+        markdown = md_arq.read_text(encoding="utf-8")
+    except UnicodeDecodeError as err:
+        raise ValueError(f"O {md_arq} não está em UTF-8. Abra e salve o arquivo como UTF-8.") from err
+    documento = montar_html(meta, markdown, paleta_nome, capa)
     render = pasta / ".render.html"
     render.write_text(documento, encoding="utf-8")
     pdf = pasta / f"{pasta.name}.pdf"
+    pdf_tmp = pasta / ".render.pdf"
     previa = pasta / "previa"
     previa.mkdir(exist_ok=True)
     for velho in previa.glob("amostra-*.png"):
         velho.unlink()
     amostras: list[Path] = []
+    clips: list[dict] = []
     try:
         with sync_playwright() as p:
             nav = p.chromium.launch()
@@ -131,11 +143,11 @@ def gerar(pasta: Path, paleta_nome: str, carrossel: "Path | None" = None) -> dic
                     pg = nav.new_page(viewport={"width": A4_W, "height": A4_H})
                 pg.goto(render.as_uri(), wait_until="load")
                 pg.emulate_media(media="print")
-                opcoes = {"path": str(pdf), "print_background": True, "prefer_css_page_size": True}
+                opcoes = {"path": str(pdf_tmp), "print_background": True, "prefer_css_page_size": True}
                 if meta["tipo"] != "slides":
                     opcoes.update(display_header_footer=True, header_template="<span></span>",
                                   footer_template=RODAPE)
-                pg.pdf(**opcoes)
+                _salvar_pdf(pg, opcoes)
                 slides = meta["tipo"] == "slides"
                 pg.emulate_media(media="screen")
                 if not slides:  # cada bloco vira uma "página" A4 com as margens do @page
@@ -158,11 +170,17 @@ def gerar(pasta: Path, paleta_nome: str, carrossel: "Path | None" = None) -> dic
                     pg.screenshot(path=str(destino), full_page=True,
                                   clip={"x": 0, "y": y, "width": largura, "height": alto})
                     amostras.append(destino)
+                    clips.append({"alvo": (el.get_attribute("class") or "").split()[0], "y": y})
             finally:
                 try:
                     nav.close()
                 except Exception:
                     pass
+    except BaseException:
+        pdf_tmp.unlink(missing_ok=True)
+        raise
+    else:
+        pdf_tmp.replace(pdf)
     finally:
         render.unlink(missing_ok=True)
 
@@ -170,14 +188,17 @@ def gerar(pasta: Path, paleta_nome: str, carrossel: "Path | None" = None) -> dic
     if carrossel is not None:
         carrossel = Path(carrossel)
         carrossel.mkdir(parents=True, exist_ok=True)
-        for velho in carrossel.glob(f"{pasta.name}-*.png"):
-            velho.unlink()
-        origens = ([pasta / "capa.png"] if (pasta / "capa.png").exists() else []) + amostras
+        padrao = re.compile(rf"{re.escape(pasta.name)}-\d{{2}}\.png")
+        for velho in carrossel.iterdir():
+            if padrao.fullmatch(velho.name):
+                velho.unlink()
+        tem_capa = (pasta / "capa.png").exists() and meta["tipo"] != "slides"
+        origens = ([pasta / "capa.png"] if tem_capa else []) + amostras
         for n, origem in enumerate(origens, 1):
             destino = carrossel / f"{pasta.name}-{n:02d}.png"
             shutil.copyfile(origem, destino)
             copiados.append(destino)
-    return {"pdf": pdf, "amostras": amostras, "carrossel": copiados}
+    return {"pdf": pdf, "amostras": amostras, "carrossel": copiados, "clips": clips}
 
 
 def main(argv: "list[str] | None" = None) -> int:

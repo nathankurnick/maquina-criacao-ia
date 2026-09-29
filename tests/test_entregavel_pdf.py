@@ -1,6 +1,7 @@
 # tests/test_entregavel_pdf.py
 import json
 import re
+from pathlib import Path
 
 import pytest
 
@@ -145,3 +146,73 @@ def test_slides_amostras_sao_os_slides_2_e_3(tmp_path):
     p = _pasta(tmp_path, tipo="slides", md="## A\n\n- x\n---\n## B\n\n- y")
     r = _gerar_ou_pular(p, "grafite-ciano")
     assert [_tamanho_png(a) for a in r["amostras"]] == [(1280, 720), (1280, 720)]
+
+
+def test_carrossel_so_apaga_os_proprios_arquivos(tmp_path):
+    p = _pasta(tmp_path, md="# Um\n\ntexto")
+    car = tmp_path / "proj" / "pagina" / "imagens" / "carrossel"
+    car.mkdir(parents=True)
+    for nome in ("guia-do-pao-01.png", "guia-foto.png", "guia-do-pao-99.png"):
+        (car / nome).write_bytes(b"x")
+    outro = tmp_path / "proj" / "entregaveis" / "guia"
+    outro.mkdir()
+    (outro / "meta.json").write_text('{"titulo": "G"}')
+    (outro / "conteudo.md").write_text("# G\n\ntexto")
+    pytest.importorskip("playwright")
+    _gerar_ou_pular(outro)
+    ep.gerar(outro, "azul-laranja", carrossel=car)
+    assert (car / "guia-do-pao-01.png").read_bytes() == b"x"
+    assert (car / "guia-foto.png").read_bytes() == b"x"
+    assert (car / "guia-01.png").exists()
+
+
+def test_pdf_antigo_sobrevive_se_a_geracao_falha(tmp_path, monkeypatch):
+    p = _pasta(tmp_path)
+    (p / "guia-do-pao.pdf").write_bytes(b"%PDF-antigo")
+
+    def falha(*a, **k):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(ep, "_salvar_pdf", falha)
+    pytest.importorskip("playwright")
+    with pytest.raises(RuntimeError):
+        ep.gerar(p, "azul-laranja")
+    assert (p / "guia-do-pao.pdf").read_bytes() == b"%PDF-antigo"
+    assert not list(p.glob(".*"))
+
+
+def test_slides_nao_copiam_capa_pro_carrossel(tmp_path):
+    p = _pasta(tmp_path, tipo="slides", md="## A\n\n- x\n---\n## B\n\n- y")
+    (p / "capa.png").write_bytes(b"png")
+    car = tmp_path / "car"
+    pytest.importorskip("playwright")
+    r = ep.gerar(p, "grafite-ciano", carrossel=car)
+    assert len(r["carrossel"]) == 2 and (car / "guia-do-pao-01.png").read_bytes() != b"png"
+
+
+def test_pasta_relativa_usa_nome_da_pasta(tmp_path, monkeypatch):
+    p = _pasta(tmp_path)
+    monkeypatch.chdir(p)
+    r = _gerar_ou_pular(Path("."))
+    assert r["pdf"].name == "guia-do-pao.pdf"
+
+
+def test_arquivos_fora_de_utf8_dao_mensagem_amiga(tmp_path):
+    p = _pasta(tmp_path)
+    (p / "meta.json").write_bytes('{"titulo": "Pão"}'.encode("latin-1"))
+    with pytest.raises(ValueError, match="UTF-8"):
+        ep.ler_meta(p)
+    p2 = _pasta(tmp_path / "b")
+    (p2 / "conteudo.md").write_bytes("# Pão\n".encode("latin-1"))
+    with pytest.raises(ValueError, match="UTF-8"):
+        ep.gerar(p2, "azul-laranja")
+
+
+def test_amostra_1_e_o_sumario_e_a_2_o_primeiro_capitulo(tmp_path):
+    p = _pasta(tmp_path)
+    r = _gerar_ou_pular(p, "preto-dourado")
+    assert [c["alvo"] for c in r["clips"]] == ["sumario", "capitulo"]
+    assert r["clips"][0]["y"] < r["clips"][1]["y"]
+    p2 = _pasta(tmp_path / "c", md="# Só\n\ntexto")
+    (p2 / "meta.json").write_text('{"titulo": "X", "tipo": "guia"}')
+    assert [c["alvo"] for c in _gerar_ou_pular(p2)["clips"]] == ["sumario", "capitulo"]
