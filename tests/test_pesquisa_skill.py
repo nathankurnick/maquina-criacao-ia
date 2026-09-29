@@ -56,3 +56,14 @@ def test_instalador_copia_skill_sem_pycache(tmp_path):
     assert (destino / "SKILL.md").exists()
     assert (destino / "scripts" / "raspar.py").exists()
     assert not list(destino.rglob("__pycache__"))
+
+
+def test_skill_md_comandos_bash_autocontidos():
+    texto = (SKILL / "SKILL.md").read_text(encoding="utf-8")
+    assert "PFX" not in texto
+    for bloco in re.findall(r"```bash\n(.*?)```", texto, re.S):
+        for linha in bloco.splitlines():
+            for var in ("PY", "S", "M"):
+                m = re.search(r'\$\{?%s\b' % var, linha)
+                if m:
+                    assert re.search(r'(^|[\s;])%s=' % var, linha[:m.start()]), linha

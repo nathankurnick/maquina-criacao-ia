@@ -9,13 +9,9 @@ Você ajuda um aluno leigo a achar uma oferta que está vendendo de verdade e a 
 **dele**, inspirada na estrutura vencedora. Fale simples, em português, um passo de cada vez.
 Nunca mostre stack trace ao aluno: se um comando falhar, explique com a mensagem do script.
 
-**Regra dos comandos (importante):** variáveis de shell NÃO persistem entre chamadas do Bash.
-Todo comando Bash desta skill começa com este prefixo de uma linha, colado por inteiro **em
-TODA chamada** (`PFX` abaixo significa "cole esta linha antes do comando"):
-
-```bash
-PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/01-pesquisa-ofertas/scripts"; M="$(command -v maquina || echo "$HOME/.local/bin/maquina")";
-```
+**Regra dos comandos (importante):** variáveis de shell NÃO persistem entre chamadas do Bash —
+cada comando Bash é independente: sempre inclua as definições no início da linha, exatamente
+como nos exemplos (só as variáveis que o comando usa: `PY`, `S`, `M`).
 
 As pastas do projeto, da busca e da oferta (`P`, `B`, `O` nos exemplos) são **caminhos absolutos
 literais** que você anotou da saída de comandos anteriores — escreva o caminho de verdade no
@@ -30,11 +26,11 @@ Scripts desta skill: `scripts/raspar.py` (Biblioteca de Anúncios), `scripts/ofe
 
 ## Passo 1 — Projeto
 
-1. `PFX "$M" projeto listar`. Se já houver projetos, pergunte se é pra usar um deles ou começar um novo.
+1. `M="$(command -v maquina || echo "$HOME/.local/bin/maquina")"; "$M" projeto listar`. Se já houver projetos, pergunte se é pra usar um deles ou começar um novo.
 2. Novo: pergunte um nome provisório (pode ser o nicho, ex.: "emagrecimento feminino") e rode
-   `PFX "$M" projeto novo "<nome>"`. Anote o caminho impresso (`P`) e o slug (última parte do caminho).
-3. Existente: rode `PFX "$M" projeto caminho <slug>` e anote o caminho.
-   Antes de modelar num projeto que já tem oferta, rode `PFX "$M" oferta mostrar <slug>` e avise:
+   `M="$(command -v maquina || echo "$HOME/.local/bin/maquina")"; "$M" projeto novo "<nome>"`. Anote o caminho impresso (`P`) e o slug (última parte do caminho).
+3. Existente: rode `M="$(command -v maquina || echo "$HOME/.local/bin/maquina")"; "$M" projeto caminho <slug>` e anote o caminho.
+   Antes de modelar num projeto que já tem oferta, rode `M="$(command -v maquina || echo "$HOME/.local/bin/maquina")"; "$M" oferta mostrar <slug>` e avise:
    "`adicionar` acrescenta às listas que já existem (não há comando de remover)". Pergunte se
    ele quer manter esse projeto ou começar um novo.
 
@@ -53,7 +49,7 @@ caminho literal). Repetir uma busca exige pasta nova (`-2`, `-3`…), porque o s
 Avise antes: "vai abrir uma janela do Chrome sozinha — não mexa nela até eu avisar". Rode (1–2 min):
 
 ```bash
-PFX "$PY" "$S/raspar.py" --termo "<termo>" --saida "<B>"        # ou --dominio site.com.br
+PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/01-pesquisa-ofertas/scripts"; "$PY" "$S/raspar.py" --termo "<termo>" --saida "<B>"        # ou --dominio site.com.br
 ```
 
 - Saída 0 → siga. Se aparecer "⚠️ A pesquisa parou antes do fim, mas salvei os N anúncios",
@@ -72,7 +68,7 @@ PFX "$PY" "$S/raspar.py" --termo "<termo>" --saida "<B>"        # ou --dominio s
 ## Passo 4 — Ranquear e mostrar o top 10
 
 ```bash
-PFX "$PY" "$S/ofertas.py" "<B>/anuncios.json" --saida "<B>"
+PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/01-pesquisa-ofertas/scripts"; "$PY" "$S/ofertas.py" "<B>/anuncios.json" --saida "<B>"
 ```
 
 Se sair com código 1, mostre a mensagem do script ao aluno e pergunte como quer seguir.
@@ -95,7 +91,7 @@ Pegue o `link` de `ofertas[N-1]` em `<B>/ofertas.json` e crie a pasta da oferta
 `<P>/pesquisa/oferta-<chave-em-slug>` (ex.: chave `hotmart.com/abc` → `oferta-hotmart-com-abc`), `O`. Rode:
 
 ```bash
-PFX "$PY" "$S/capturar.py" --url "<link>" --saida "<O>"
+PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/01-pesquisa-ofertas/scripts"; "$PY" "$S/capturar.py" --url "<link>" --saida "<O>"
 ```
 
 Se sair com 130 ou 1, mostre a mensagem do script e pergunte ao aluno como seguir.
@@ -131,15 +127,15 @@ Mostre a proposta e **só salve depois que o aluno aprovar** (ajuste quantas vez
 ## Passo 8 — Salvar no oferta.md
 
 Nunca escreva o YAML do `oferta.md` à mão. Use o comando `maquina oferta definir` e o
-`maquina oferta adicionar` (via `"$M"`, com o prefixo). Valores sempre em aspas simples;
+`maquina oferta adicionar` (via `"$M"`, com a definição de `M` no início). Valores sempre em aspas simples;
 apóstrofo dentro do valor vira `'\''`:
 
 ```bash
-PFX "$M" oferta definir <slug> nome='...' nicho='...' avatar='...' promessa='...' mecanismo='...' preco='R$ 97,00' garantia='...'
-PFX "$M" oferta adicionar <slug> entregaveis '<item>'      # um por item
-PFX "$M" oferta adicionar <slug> bonus '<item>'            # item que começa com "-": use -- antes
-PFX "$M" oferta faltando <slug>                            # deve voltar vazio
+M="$(command -v maquina || echo "$HOME/.local/bin/maquina")"; "$M" oferta definir <slug> nome='...' nicho='...' avatar='...' promessa='...' mecanismo='...' preco='R$ 97,00' garantia='...'
+M="$(command -v maquina || echo "$HOME/.local/bin/maquina")"; "$M" oferta adicionar <slug> entregaveis '<item>'      # um por item
+M="$(command -v maquina || echo "$HOME/.local/bin/maquina")"; "$M" oferta adicionar <slug> bonus '<item>'            # item que começa com "-": use -- antes
+M="$(command -v maquina || echo "$HOME/.local/bin/maquina")"; "$M" oferta faltando <slug>                            # deve voltar vazio
 ```
 
-Confira com `PFX "$M" oferta mostrar <slug>`. Encerre dizendo o que foi salvo e que o próximo
+Confira com `M="$(command -v maquina || echo "$HOME/.local/bin/maquina")"; "$M" oferta mostrar <slug>`. Encerre dizendo o que foi salvo e que o próximo
 passo é o `/02-pagina-de-vendas` (ou `/03-entregaveis`).
