@@ -25,8 +25,8 @@ def _ad(aid, link="https://loja.com/a", texto="Copy grande o suficiente", pagina
 @pytest.mark.parametrize("link,chave", [
     ("https://www.loja.com.br/oferta?utm=1", "loja.com.br"),
     ("loja.com.br/x", "loja.com.br"),
-    ("https://pay.kiwify.com.br/AbC123?x", "pay.kiwify.com.br/AbC123"),
-    ("https://go.hotmart.com/Q123/", "go.hotmart.com/Q123"),
+    ("https://pay.kiwify.com.br/AbC123?x", "kiwify.com.br/AbC123"),
+    ("https://go.hotmart.com/Q123/", "hotmart.com/Q123"),
     ("https://wa.me/5511999999999", "wa.me/5511999999999"),
     ("https://l.facebook.com/l.php?u=https%3A%2F%2Floja.com%2Fp&h=x", "loja.com"),
     ("https://www.facebook.com/pagina", None),
@@ -122,3 +122,67 @@ def test_main_arquivo_invalido_mensagem_amigavel(tmp_path, capsys):
     err = capsys.readouterr().err
     assert "Não consegui ler" in err and "Traceback" not in err
     assert of.main([str(tmp_path / "nao-existe.json"), "--saida", str(tmp_path)]) == 1
+
+
+@pytest.mark.parametrize("link,chave", [
+    ("https://pay.hotmart.com/A123", "hotmart.com/A123"),
+    ("https://go.hotmart.com/A123?ap=1", "hotmart.com/A123"),
+    ("https://hotmart.com/pt-br/marketplace/produtos/x", "hotmart.com/x"),
+    ("https://hotmart.com/en/product/abc", "hotmart.com/abc"),
+    ("https://pay.kiwify.com.br/AbC", "kiwify.com.br/AbC"),
+    ("https://bit.ly/3xYz", "bit.ly/3xYz"),
+    ("https://bit.ly/aaa", "bit.ly/aaa"),
+    ("https://t.co/Qw1", "t.co/Qw1"),
+    ("https://[bad/x", None),
+])
+def test_chave_oferta_plataformas_e_encurtadores(link, chave):
+    assert of.chave_oferta(link) == chave
+
+
+def test_encurtadores_distintos_nao_colapsam():
+    assert of.chave_oferta("https://bit.ly/a") != of.chave_oferta("https://bit.ly/b")
+
+
+def test_hoje_invalido_mensagem_amigavel(tmp_path, capsys):
+    e = tmp_path / "a.json"
+    e.write_text("[]")
+    assert of.main([str(e), "--saida", str(tmp_path), "--hoje", "ontem"]) == 1
+    err = capsys.readouterr().err
+    assert "--hoje" in err and "Traceback" not in err
+
+
+def test_anuncios_malformados_nao_quebram(tmp_path, capsys):
+    ruins = [
+        "texto", 5, None, [],
+        {"link": "https://a.com/x", "texto": "Texto grande o bastante", "repeticoes": "abc", "inicio": "x"},
+        {"id": "9", "link": "https://a.com/y", "texto": "Texto grande o bastante", "repeticoes": 3.7,
+         "inicio": 10**30},
+        {"id": "8", "link": "https://a.com/z", "texto": "Texto grande o bastante", "repeticoes": 0,
+         "inicio": -10**30},
+        {"id": "7", "link": "https://a.com/w", "texto": "Texto grande o bastante", "repeticoes": None,
+         "inicio": True},
+    ]
+    r = of.analisar(ruins, HOJE)
+    assert r["invalidos"] == 4
+    assert r["ofertas"][0]["chave"] == "a.com"
+    assert r["ofertas"][0]["dias"] is None
+    e = tmp_path / "a.json"
+    e.write_text(json.dumps(ruins))
+    assert of.main([str(e), "--saida", str(tmp_path / "o"), "--hoje", "2026-09-28"]) == 0
+    assert "inválidos" in capsys.readouterr().out
+
+
+def test_sem_invalidos_nao_menciona(tmp_path, capsys):
+    e = tmp_path / "a.json"
+    e.write_text(json.dumps([_ad("1")]))
+    of.main([str(e), "--saida", str(tmp_path / "o"), "--hoje", "2026-09-28"])
+    assert "inválidos" not in capsys.readouterr().out
+
+
+def test_tabela_escapa_pipe_e_quebra_de_linha():
+    o = {"chave": "a|b", "anunciantes": ["Lo|ja\nX\nY".replace("\\n", "\n")], "volume": 1, "dias": None,
+         "midia": "vídeo", "selo": "s", "pontuacao": 1.0, "link": "https://a.com/?q=1|2"}
+    linha = of.tabela_markdown([o]).splitlines()[2]
+    assert "a\\|b" in linha and "Lo\\|ja" in linha and "\n" not in linha
+    assert linha.replace("\\|", "").count("|") == 9
+    assert "| Volume |" in of.tabela_markdown([o])
