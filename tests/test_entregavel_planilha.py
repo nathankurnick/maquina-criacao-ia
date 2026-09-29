@@ -72,3 +72,12 @@ def test_utf8_invalido_atomico_e_controle(tmp_path, capsys):
     arq = ep.gerar_xlsx([{"nome": "A", "colunas": ["x\x01y"], "linhas": []}], tmp_path / "a.xlsx")
     assert b"\x01" not in zipfile.ZipFile(arq).read("xl/worksheets/sheet1.xml")
     assert not list(tmp_path.glob("*.tmp"))
+
+
+def test_calc_on_load_e_apostrofos(tmp_path):
+    arq = ep.gerar_xlsx([{"nome": "'Plano'", "colunas": ["A"], "linhas": []},
+                         {"nome": "'''", "colunas": ["A"], "linhas": []}], tmp_path / "a.xlsx")
+    z = zipfile.ZipFile(arq)
+    wb = z.read("xl/workbook.xml").decode()
+    assert '</sheets><calcPr fullCalcOnLoad="1"/>' in wb
+    assert [s.get("name") for s in ET.fromstring(wb).find("m:sheets", NS)] == ["Plano", "Planilha"]

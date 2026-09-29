@@ -36,8 +36,8 @@ def _coluna(n: int) -> str:
 
 
 def _nome_aba(nome: str, usados: set) -> str:
-    base = re.sub(r"[\[\]:*?/\\]", "", str(nome or "Planilha")).strip()[:31] or "Planilha"
-    base = re.sub(r"\s+", " ", base)
+    base = re.sub(r"[\[\]:*?/\\]", "", str(nome or "Planilha"))
+    base = re.sub(r"\s+", " ", base).strip().strip("'").strip()[:31].strip("'").strip() or "Planilha"
     candidato, n = base, 2
     while candidato.lower() in usados:
         sufixo = f" ({n})"
@@ -94,7 +94,7 @@ def gerar_xlsx(abas: list[dict], destino: Path) -> Path:
     sheets = "".join(f'<sheet name="{escape(nome, {chr(34): "&quot;"})}" sheetId="{i}" r:id="rId{i}"/>'
                      for i, nome in enumerate(nomes, 1))
     workbook = (f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<workbook xmlns="{_MAIN}" '
-                f'xmlns:r="{_REL}"><sheets>{sheets}</sheets></workbook>')
+                f'xmlns:r="{_REL}"><sheets>{sheets}</sheets><calcPr fullCalcOnLoad="1"/></workbook>')
     wb_rels = "".join(f'<Relationship Id="rId{i}" Type="{_REL}/worksheet" Target="worksheets/sheet{i}.xml"/>'
                       for i in range(1, n + 1))
     wb_rels = (f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="{_PKG}">'
