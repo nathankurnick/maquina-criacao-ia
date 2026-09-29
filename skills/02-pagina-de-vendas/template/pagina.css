@@ -32,6 +32,7 @@ h3{font-size:16px;font-weight:700}
 .cartao-vidro{background:rgba(255,255,255,.05);box-shadow:inset 0 0 0 1px rgba(255,255,255,.1)}
 .icone{display:block;width:28px;height:28px;color:var(--pg-destaque)}
 .cartao-vidro .icone+h3{margin-top:16px}
+a.cta:focus-visible,summary:focus-visible{outline:3px solid var(--pg-destaque);outline-offset:2px}
 .rotulo{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--pg-destaque)}
 .rotulo+h3{margin-top:8px}
 .valor{margin-top:16px;font-size:14px}

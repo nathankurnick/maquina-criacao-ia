@@ -71,7 +71,7 @@ def test_blocos_escondidos_nao_aparecem():
 def test_imagens_logo_carrossel_depoimentos():
     h = _html(imagens={"logo": "img/logo.png", "carrossel": ["img/carrossel-01.png"],
                        "depoimentos": ["img/depoimento-01.jpg", "img/depoimento-02.jpg"]})
-    assert '<img class="logo" src="img/logo.png" alt="">' in h
+    assert '<img class="logo" src="img/logo.png" alt="Pão Fácil">' in h
     assert 'src="img/carrossel-01.png"' in h and "Veja o material por dentro" in h
     assert h.count('alt="Depoimento') == 2
 
@@ -180,3 +180,72 @@ def test_pagina_sem_rolagem_horizontal_no_celular(tmp_path):
             pytest.skip("Chromium do Playwright não instalado")
         raise
     assert largura <= 390
+
+
+def test_href_perigoso_nunca_vai_pro_html():
+    for ruim in ("javascript:alert(1)", "data:text/html,x", "texto solto", "//evil.com"):
+        bruto = {"hero": {"headline": "H"}, "planos": {"basico": {"checkoutUrl": ruim, "precoPor": "R$ 1"}}}
+        c, avisos = pc.normalizar(bruto)
+        assert any("não é um endereço válido" in a for a in avisos)
+        h = _html(conteudo=c)
+        assert ruim not in h and 'class="cta" href="#"' in h
+    assert pr._cta("javascript:alert(1)", "X") == '<a class="cta" href="#">X</a>'
+
+
+def test_logo_so_stem_exato(tmp_path):
+    p = _projeto(tmp_path)
+    img = p / "pagina" / "imagens"
+    img.mkdir()
+    (img / "logo.backup.png").write_bytes(b"x")
+    (img / "LOGO.PNG").write_bytes(b"y")
+    pr.montar_site(p)
+    assert sorted(x.name for x in (p / "pagina" / "site" / "img").iterdir()) == ["logo.png"]
+    (img / "LOGO.PNG").unlink()
+    pr.montar_site(p)
+    assert not (p / "pagina" / "site" / "img" / "logo.png").exists()
+
+
+def test_falha_mantem_site_antigo(tmp_path, monkeypatch, capsys):
+    p = _projeto(tmp_path)
+    c = p / "pagina" / "imagens" / "carrossel"
+    c.mkdir(parents=True)
+    for n in "ab":
+        (c / f"{n}.png").write_bytes(b"x")
+    pr.montar_site(p)
+    site = p / "pagina" / "site"
+    antigo = (site / "index.html").read_text(encoding="utf-8")
+    chamadas = []
+
+    def falha(*a, **k):
+        chamadas.append(1)
+        if len(chamadas) == 2:
+            raise OSError("disco cheio")
+
+    monkeypatch.setattr(pr.shutil, "copyfile", falha)
+    monkeypatch.setenv("MAQUINA_HOME", str(tmp_path / "home"))
+    assert pr.main(["--projeto", str(p)]) == 1
+    assert (site / "index.html").read_text(encoding="utf-8") == antigo
+    assert not (p / "pagina" / ".site-novo").exists()
+
+
+def test_com_destaque_sem_asteriscos_sobrando():
+    assert "*" not in pr.com_destaque("a ** b **c** d ** e")
+    assert pr.com_destaque("x ** ** y") == "x   y"
+    assert pr.com_destaque("**a** e **b") == '<span class="destaque">a</span> e b'
+
+
+def test_logo_alt_noscript_e_foco():
+    cfg = dict(pc.CONFIG_PADRAO, pixel_meta="123456789012")
+    h = _html(config=cfg, imagens={"logo": "img/logo.png", "carrossel": [], "depoimentos": []})
+    assert '<img class="logo" src="img/logo.png" alt="Pão Fácil">' in h
+    assert '<noscript><img height="1" width="1" style="display:none" ' in h
+    assert "id=123456789012&amp;ev=PageView&amp;noscript=1" in h
+    assert "a.cta:focus-visible,summary:focus-visible{outline" in h
+
+
+def test_aspas_escapadas_em_atributos_e_texto():
+    c = _conteudo(hero={"headline": 'Diga "oi"', "cta": 'Vai "já"'})
+    c["planos"]["basico"]["checkoutUrl"] = 'https://x.com/a"onclick="y'
+    h = _html(conteudo=c)
+    assert 'href="https://x.com/a&quot;onclick=&quot;y"' in h
+    assert "Diga &quot;oi&quot;" in h and "Vai &quot;já&quot;" in h

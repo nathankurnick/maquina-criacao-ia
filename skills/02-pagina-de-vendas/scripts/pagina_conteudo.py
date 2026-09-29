@@ -102,6 +102,12 @@ def _titulo_descricao(v) -> dict:
     return {"titulo": _texto(o.get("titulo")), "descricao": _texto(o.get("descricao"))}
 
 
+def url_segura(u: str) -> bool:
+    u = (u or "").strip()
+    return bool(re.match(r"(?i)https?://[^\s]+$", u) or re.match(r"#\S*$", u)
+                or (re.match(r"/(?!/)\S*$", u) is not None))
+
+
 def _plano(v, nome_padrao: str, ativo_padrao: bool, destaque: bool) -> dict:
     o = _objeto(v)
     return {
@@ -162,6 +168,10 @@ def normalizar(bruto: object) -> "tuple[dict, list[str]]":
     p = bloco("planos")
     basico = _plano(p.get("basico"), "PLANO BÁSICO", True, False)
     premium = _plano(p.get("premium"), "PLANO PREMIUM", False, True)
+    for pl in (basico, premium):
+        if pl["checkoutUrl"] and not url_segura(pl["checkoutUrl"]):
+            pl["checkoutUrl"] = ""
+            avisos.append("planos: o link de checkout não é um endereço válido (precisa começar com https://).")
     if premium["ativo"] and (not premium["checkoutUrl"] or premium["checkoutUrl"] == basico["checkoutUrl"]):
         premium["ativo"] = False
         avisos.append("planos: o premium está sem link ou com o mesmo checkout do básico — escondido.")

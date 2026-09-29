@@ -15,7 +15,7 @@ import traceback
 from datetime import date, datetime
 from pathlib import Path
 
-from pagina_conteudo import ICONES, PALETA_PADRAO, PALETAS, ler_config, normalizar
+from pagina_conteudo import ICONES, PALETA_PADRAO, PALETAS, ler_config, normalizar, url_segura
 
 CSS = Path(__file__).resolve().parent.parent / "template" / "pagina.css"
 EXT_FOTO = (".png", ".jpg", ".jpeg", ".webp")
@@ -45,11 +45,14 @@ def e(texto: str) -> str:
 
 def com_destaque(texto: str) -> str:
     partes = re.split(r"(\*\*[^*]+\*\*)", texto or "")
-    return "".join(
-        f'<span class="destaque">{e(p[2:-2])}</span>' if p.startswith("**") and p.endswith("**") and len(p) > 4
-        else e(p)
-        for p in partes
-    )
+    saida = []
+    for p in partes:
+        if p.startswith("**") and p.endswith("**") and len(p) > 4:
+            miolo = p[2:-2]
+            saida.append(f'<span class="destaque">{e(miolo)}</span>' if miolo.strip() else e(miolo))
+        else:
+            saida.append(e(p.replace("**", "")))
+    return "".join(saida)
 
 
 def _icone(nome: str) -> str:
@@ -59,6 +62,7 @@ def _icone(nome: str) -> str:
 
 
 def _cta(href: str, texto: str) -> str:
+    href = href if url_segura(href) else "#"
     return f'<a class="cta" href="{e(href)}">{e(texto)}</a>'
 
 
@@ -74,12 +78,12 @@ def _cabeca(b: dict) -> str:
     return s
 
 
-def _hero(b, logo, href):
+def _hero(b, logo, href, nome=""):
     if not b["ativo"]:
         return ""
     partes = []
     if logo:
-        partes.append(f'<img class="logo" src="{e(logo)}" alt="">')
+        partes.append(f'<img class="logo" src="{e(logo)}" alt="{e(nome)}">')
     if b["badge"]:
         partes.append(f'<p class="badge">{e(b["badge"])}</p>')
     partes.append(f"<h1>{com_destaque(b['headline'])}</h1>")
@@ -203,7 +207,9 @@ def _pixels(meta: str, google: str) -> str:
               "n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;"
               "t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,"
               "document,'script','https://connect.facebook.net/en_US/fbevents.js');"
-              f"fbq('init','{meta}');fbq('track','PageView');</script>\n")
+              f"fbq('init','{meta}');fbq('track','PageView');</script>\n"
+              '<noscript><img height="1" width="1" style="display:none" '
+              f'src="https://www.facebook.com/tr?id={meta}&amp;ev=PageView&amp;noscript=1"></noscript>\n')
     if google:
         s += (f'<script async src="https://www.googletagmanager.com/gtag/js?id={google}"></script>\n'
               "<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}"
@@ -221,7 +227,7 @@ def render_html(conteudo: dict, config: dict, imagens: dict, ano: int) -> str:
               or conteudo["rodape"]["nomeProduto"] or "Página de vendas")
     descricao = config.get("seo_descricao") or hero["subheadline"]
     corpo = "".join([
-        _hero(hero, imagens.get("logo", ""), href),
+        _hero(hero, imagens.get("logo", ""), href, conteudo["rodape"]["nomeProduto"]),
         _carrossel(conteudo["carrossel"], imagens.get("carrossel", [])),
         _para_quem(conteudo["paraQuem"], href),
         _conteudo(conteudo["conteudo"]),
@@ -268,20 +274,30 @@ def montar_site(pasta_projeto: Path) -> "tuple[Path, list[str]]":
     config = ler_config(pagina)
 
     site = pagina / "site"
-    if site.exists():
-        shutil.rmtree(site)
-    (site / "img").mkdir(parents=True)
+    novo = pagina / ".site-novo"
+    if novo.exists():
+        shutil.rmtree(novo)
+    (novo / "img").mkdir(parents=True)
+    try:
+        return _montar(pagina, conteudo, config, avisos, site, novo)
+    except BaseException:
+        shutil.rmtree(novo, ignore_errors=True)
+        raise
+
+
+def _montar(pagina, conteudo, config, avisos, site, novo):
 
     imagens = {"logo": "", "carrossel": [], "depoimentos": []}
-    logos = [p for p in sorted((pagina / "imagens").glob("logo.*")) if p.suffix.lower() in EXT_LOGO] \
+    logos = [p for p in sorted((pagina / "imagens").iterdir())
+             if p.is_file() and p.stem.lower() == "logo" and p.suffix.lower() in EXT_LOGO] \
         if (pagina / "imagens").is_dir() else []
     if logos:
-        destino = site / "img" / f"logo{logos[0].suffix.lower()}"
+        destino = novo / "img" / f"logo{logos[0].suffix.lower()}"
         shutil.copyfile(logos[0], destino)
         imagens["logo"] = f"img/{destino.name}"
     for tipo, prefixo in (("carrossel", "carrossel"), ("depoimentos", "depoimento")):
         for n, foto in enumerate(_fotos(pagina / "imagens" / tipo), 1):
-            destino = site / "img" / f"{prefixo}-{n:02d}{foto.suffix.lower()}"
+            destino = novo / "img" / f"{prefixo}-{n:02d}{foto.suffix.lower()}"
             shutil.copyfile(foto, destino)
             imagens[tipo].append(f"img/{destino.name}")
     if not imagens["depoimentos"]:
@@ -290,9 +306,12 @@ def montar_site(pasta_projeto: Path) -> "tuple[Path, list[str]]":
     if conteudo["carrossel"]["ativo"] and not imagens["carrossel"]:
         avisos.append("carrossel: sem imagens em pagina/imagens/carrossel/ — a seção fica escondida.")
 
-    index = site / "index.html"
+    index = novo / "index.html"
     index.write_text(render_html(conteudo, config, imagens, date.today().year), encoding="utf-8")
-    return index, avisos
+    if site.exists():
+        shutil.rmtree(site)
+    novo.rename(site)
+    return site / "index.html", avisos
 
 
 def main(argv: "list[str] | None" = None) -> int:
