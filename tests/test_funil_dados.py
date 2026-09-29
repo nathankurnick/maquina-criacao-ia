@@ -50,12 +50,24 @@ def test_ler_funil_completo_e_projecao(tmp_path):
     assert p["ticket_medio"] == pytest.approx(esperado)
     assert p["aumento_pct"] == pytest.approx((esperado - 27) / 27 * 100)
     assert [x["etapa"] for x in p["partes"]] == ["front", "bump", "upsell", "downsell"]
+    assert p["aumento_upsell_pct"] == pytest.approx(67 * 0.15 / 27 * 100)
 
 
 def test_ler_funil_so_front(tmp_path):
     f = fd.ler_funil(_gravar(tmp_path, {"front": {"nome": "F", "preco": "R$ 19,90"}}))
     assert f["bump"] is None and f["upsell"] is None and f["downsell"] is None
     assert fd.projetar(f)["aumento_pct"] == 0
+    assert fd.projetar(f)["aumento_upsell_pct"] == 0
+
+
+def test_aumento_upsell_ignora_bump_e_downsell(tmp_path):
+    f = fd.ler_funil(_gravar(tmp_path, {
+        "front": {"nome": "F", "preco": 100}, "bump": {"nome": "B", "preco": 50, "conversao": 0.4},
+        "upsell": {"nome": "U", "preco": 250, "conversao": 0.1},
+        "downsell": {"nome": "D", "preco": 100, "conversao": 0.2}}))
+    p = fd.projetar(f)
+    assert p["aumento_upsell_pct"] == pytest.approx(25.0)
+    assert p["aumento_pct"] > p["aumento_upsell_pct"]
 
 
 @pytest.mark.parametrize("dados,trecho", [

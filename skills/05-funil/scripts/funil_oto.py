@@ -40,6 +40,9 @@ PADROES = {
 }
 
 
+COPY_ABAIXO_TEXTO = "Leia a mensagem acima até o final — seu acesso aparece em seguida."
+
+
 class SemToken(Exception):
     pass
 
@@ -47,7 +50,7 @@ class SemToken(Exception):
 class _Parser(argparse.ArgumentParser):
     def error(self, message):
         print("❌ Comando incompleto (falta --pasta ou valor inválido). Use: funil_oto.py --pasta <P>/funil/upsell "
-              "[--paleta nome] [--publicar]", file=sys.stderr)
+              "[--paleta nome] [--publicar] [--definir-url https://…]", file=sys.stderr)
         raise SystemExit(1)
 
 
@@ -123,17 +126,25 @@ def ler_oto(pasta: Path) -> dict:
         embed_video(oto["video"])
     elif not oto["texto"]:
         raise ValueError('no formato "texto", escreva a copy no campo texto.')
+    if oto["formato"] == "texto" and not _txt(bruto.get("copy_abaixo")):
+        oto["copy_abaixo"] = COPY_ABAIXO_TEXTO
     oto["botao_html"] = _txt(bruto.get("botao_html"))
     oto["checkout_url"] = _txt(bruto.get("checkout_url"))
-    if not oto["botao_html"] and not checkout_valido(oto["checkout_url"]):
+    oto["botao_no_player"] = bruto.get("botao_no_player") is True
+    if not oto["botao_no_player"] and not oto["botao_html"] and not checkout_valido(oto["checkout_url"]):
         raise ValueError("checkout_url precisa ser o link real de pagamento do upsell (https://…), "
-                         "ou cole o código do botão de 1 clique em botao_html.")
+                         "ou cole o código do botão de 1 clique em botao_html "
+                         "(ou use botao_no_player: true se o botão aparece dentro do vídeo).")
     atraso = bruto.get("atraso_segundos", 0)
     if isinstance(atraso, bool) or not isinstance(atraso, int) or atraso < 0:
         raise ValueError("atraso_segundos precisa ser um número inteiro de segundos (0 ou mais).")
     oto["atraso_segundos"] = atraso
     oto["recusar_url"] = _txt(bruto.get("recusar_url"))
-    if oto["recusar_url"] and not checkout_valido(oto["recusar_url"]):
+    if not oto["recusar_url"]:
+        raise ValueError("falta o recusar_url: é pra onde vai quem clica em \"não, obrigado\". Coloque o link da "
+                         "página de downsell (se este for o upsell e houver downsell) ou o link da página de obrigado / "
+                         "área de membros da plataforma (https://…).")
+    if not checkout_valido(oto["recusar_url"]):
         raise ValueError("recusar_url precisa ser um endereço https:// (a próxima página: downsell ou obrigado).")
     return oto
 
@@ -146,9 +157,12 @@ def html_oto(oto: dict, paleta_nome: str) -> str:
     else:
         paragrafos = "".join(f"<p>{e(p.strip())}</p>" for p in re.split(r"\n\s*\n", oto["texto"]) if p.strip())
         miolo = f'<div class="texto">{paragrafos}</div>'
-    botao = oto["botao_html"] or f'<a class="botao" href="{e(oto["checkout_url"])}">{e(oto["botao_texto"])}</a>'
-    recusar = (f'<br><a class="recusar" href="{e(oto["recusar_url"])}">{e(oto["recusar_texto"])}</a>'
-               if oto["recusar_url"] else "")
+    if oto.get("botao_no_player"):
+        botao = ""
+    else:
+        botao = oto["botao_html"] or f'<a class="botao" href="{e(oto["checkout_url"])}">{e(oto["botao_texto"])}</a>'
+    recusar = (f'{"<br>" if botao else ""}<a class="recusar" href="{e(oto["recusar_url"])}">'
+               f'{e(oto["recusar_texto"])}</a>' if oto["recusar_url"] else "")
     classe = "oferta escondida" if oto["atraso_segundos"] > 0 else "oferta"
     script = ("<script>setTimeout(function(){var o=document.getElementById('oferta');"
               f"if(o){{o.classList.remove('escondida');}}}},{oto['atraso_segundos'] * 1000});</script>"
@@ -161,6 +175,29 @@ def html_oto(oto: dict, paleta_nome: str) -> str:
             f'<p class="aviso">{e(oto["pre_headline"])}</p><div class="caixa"><h1>{e(oto["headline"])}</h1>'
             f'{miolo}<p class="abaixo">{e(oto["copy_abaixo"])}</p><div id="oferta" class="{classe}">{botao}{recusar}</div>'
             f"</div>{script}</body></html>\n")
+
+
+def _paleta_efetiva(pasta: Path, escolhida: str = "") -> str:
+    """--paleta > <P>/pagina/config.json > paleta do oferta.md > padrão (P = pasta.parents[1])."""
+    if escolhida:
+        return escolhida
+    proj = Path(pasta).resolve().parents[1]
+    try:
+        dados = json.loads((proj / "pagina" / "config.json").read_text(encoding="utf-8"))
+        nome = dados.get("paleta", "") if isinstance(dados, dict) else ""
+        if nome in PALETAS:
+            return nome
+    except (OSError, ValueError):
+        pass
+    try:
+        from nucleo.projeto import ler_oferta
+        o = ler_oferta(proj)
+        nome = getattr(o, "paleta", "") if o else ""
+        if nome in PALETAS:
+            return nome
+    except Exception:  # noqa: BLE001
+        pass
+    return PALETA_PADRAO
 
 
 def montar(pasta: Path, paleta_nome: str) -> Path:
@@ -199,6 +236,21 @@ def _config(pasta: Path) -> dict:
         return {}
 
 
+def definir_url(pasta: Path, url: str) -> str:
+    """Grava o endereço publicado à mão (Netlify Drop) no config.json. Devolve o endereço anterior."""
+    url = (url or "").strip()
+    if not checkout_valido(url):
+        raise ValueError("o endereço precisa começar com https:// (copie o link inteiro da Netlify).")
+    pasta = Path(pasta).resolve()
+    config = _config(pasta)
+    anterior = config.get("url", "")
+    config["url"] = url
+    tmp = pasta / ".config.json.tmp"
+    tmp.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
+    os.replace(tmp, pasta / "config.json")
+    return anterior
+
+
 def publicar(pasta: Path) -> dict:
     pasta = Path(pasta).resolve()
     site = pasta / "site"
@@ -222,6 +274,7 @@ def main(argv: "list[str] | None" = None) -> int:
     ap.add_argument("--pasta", required=True)
     ap.add_argument("--paleta", default="")
     ap.add_argument("--publicar", action="store_true")
+    ap.add_argument("--definir-url", default="")
     try:
         args = ap.parse_args(argv)
     except SystemExit as s:
@@ -234,8 +287,18 @@ def main(argv: "list[str] | None" = None) -> int:
         print(f'❌ Paleta "{args.paleta}" não existe. Use: {", ".join(PALETAS)}.', file=sys.stderr)
         return 1
     pasta = Path(args.pasta).resolve()
+    if args.definir_url:
+        try:
+            anterior = definir_url(pasta, args.definir_url)
+        except (ValueError, OSError) as err:
+            print(f"❌ {err}", file=sys.stderr)
+            return 1
+        print(f"✅ Endereço salvo: {args.definir_url.strip()}")
+        if anterior and anterior != args.definir_url.strip():
+            print(f"⚠️ O endereço mudou: {anterior} → {args.definir_url.strip()}. Atualize na plataforma.")
+        return 0
     try:
-        index = montar(pasta, args.paleta or PALETA_PADRAO)
+        index = montar(pasta, _paleta_efetiva(pasta, args.paleta))
         print(f"✅ Página montada: {index}")
         if not args.publicar:
             return 0

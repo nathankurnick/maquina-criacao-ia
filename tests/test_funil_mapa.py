@@ -74,15 +74,41 @@ def _html(tmp_path, upsell_conv=0.15, bump_conv=0.3, preco_up=67):
     return fm.html_mapa(f, fd.projetar(f), "azul-laranja")
 
 
+def _up(preco_up, conv=0.10, **extra):
+    return {"front": {"nome": "F", "preco": 100}, "upsell": {"nome": "U", "preco": preco_up, "conversao": conv}, **extra}
+
+
 def test_faixas_do_resumo(tmp_path):
-    baixo = _ler(tmp_path, {"front": {"nome": "F", "preco": 100}, "bump": {"nome": "B", "preco": 10, "conversao": 0.3}})
-    assert "⚠️ abaixo da meta de 25–30%" in fm.html_mapa(baixo, fd.projetar(baixo), "azul-laranja")
-    meio = _ler(tmp_path, {"front": {"nome": "F", "preco": 100}, "bump": {"nome": "B", "preco": 90, "conversao": 0.3}})
+    # bump grande sozinho NÃO conta: a meta vale só para o upsell
+    baixo = _ler(tmp_path, {"front": {"nome": "F", "preco": 100}, "bump": {"nome": "B", "preco": 90, "conversao": 0.3}})
+    h = fm.html_mapa(baixo, fd.projetar(baixo), "azul-laranja")
+    assert "⚠️ abaixo da meta de 25–30%" in h
+    meio = _ler(tmp_path, _up(275))
     h = fm.html_mapa(meio, fd.projetar(meio), "azul-laranja")
     assert "✅ dentro da meta de 25–30%" in h and "otimistas" not in h
     alto = _ler(tmp_path, _funil())
     h = fm.html_mapa(alto, fd.projetar(alto), "azul-laranja")
     assert "✅ acima da meta de 25–30%" in h and "confira se as conversões não estão otimistas" in h
+
+
+def test_resumo_separa_upsell_e_total(tmp_path):
+    f = _ler(tmp_path, _up(275, bump={"nome": "B", "preco": 50, "conversao": 0.4}))
+    p = fd.projetar(f)
+    h = fm.html_mapa(f, p, "azul-laranja")
+    assert "Ticket médio projetado (produto + bump + upsell + downsell)" in h
+    assert "Aumento total sobre o produto principal: 48%" in h
+    assert "Aumento do upsell: 28%" in h and "dentro da meta de 25–30%" in h
+    assert h.count("da meta") == 1  # o total não leva selo de meta
+
+
+def test_exemplo_do_skill_cai_na_faixa(tmp_path):
+    f = _ler(tmp_path, {"front": {"nome": "Marmitas Já", "preco": 27},
+                        "bump": {"nome": "Lista", "preco": 9.9, "conversao": 0.2},
+                        "upsell": {"nome": "Cardápio 30 dias", "preco": 72, "conversao": 0.10},
+                        "downsell": {"nome": "Cardápio 15 dias", "preco": 37, "conversao": 0.10}})
+    p = fd.projetar(f)
+    assert 25 <= p["aumento_upsell_pct"] <= 30 and 72 >= 2.5 * 27
+    assert "dentro da meta" in fm.html_mapa(f, p, "azul-laranja")
 
 
 def test_fora_da_referencia(tmp_path):

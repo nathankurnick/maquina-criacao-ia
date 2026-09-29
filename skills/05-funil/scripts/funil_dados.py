@@ -108,7 +108,11 @@ def projetar(funil: dict) -> dict:
             partes.append({"etapa": "downsell", "nome": d["nome"],
                            "valor": d["preco"] * (1 - u["conversao"]) * d["conversao"]})
     ticket = sum(p["valor"] for p in partes)
-    return {"ticket_medio": ticket, "aumento_pct": (ticket - front) / front * 100, "partes": partes}
+    up = funil.get("upsell")
+    # a meta do método vale só para o upsell: conversão do upsell × ticket do upsell ÷ front
+    aumento_upsell = up["conversao"] * up["preco"] / front * 100 if up else 0.0
+    return {"ticket_medio": ticket, "aumento_pct": (ticket - front) / front * 100,
+            "aumento_upsell_pct": aumento_upsell, "partes": partes}
 
 
 def brl(valor: float) -> str:

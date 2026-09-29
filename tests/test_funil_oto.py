@@ -10,7 +10,8 @@ def _pasta(tmp_path, **oto):
     p = tmp_path / "proj" / "funil" / "upsell"
     p.mkdir(parents=True)
     base = {"formato": "video", "video": "https://www.youtube.com/watch?v=abcDEF12345",
-            "checkout_url": "https://pay.kiwify.com.br/up123", "atraso_segundos": 0}
+            "checkout_url": "https://pay.kiwify.com.br/up123", "atraso_segundos": 0,
+            "recusar_url": "https://site.com/obrigado"}
     base.update(oto)
     (p / "oto.json").write_text(json.dumps(base), encoding="utf-8")
     return p
@@ -186,3 +187,58 @@ def test_semtoken_mensagens_consistentes_com_o_02(ambiente, tmp_path, capsys):
 def test_texto_usa_cor_escura_explicita():
     css = (fo.CSS).read_text(encoding="utf-8")
     assert "color:var(--pg-texto-escuro)" in [l for l in css.splitlines() if l.startswith(".texto{")][0].replace(" ", "")
+
+
+def test_recusar_url_obrigatorio(tmp_path):
+    p = _pasta(tmp_path, recusar_url="")
+    with pytest.raises(ValueError, match="recusar_url") as ex:
+        fo.ler_oto(p)
+    assert "obrigado" in str(ex.value).lower() and "downsell" in str(ex.value).lower()
+
+
+def test_botao_no_player(tmp_path):
+    p = _pasta(tmp_path, checkout_url="", botao_no_player=True)
+    o = fo.ler_oto(p)
+    assert o["botao_no_player"] is True
+    h = fo.html_oto(o, "azul-laranja")
+    assert 'class="botao"' not in h and 'class="recusar"' in h
+    with pytest.raises(ValueError, match="recusar_url"):
+        fo.ler_oto(_pasta(tmp_path / "x", checkout_url="", botao_no_player=True, recusar_url=""))
+    with pytest.raises(ValueError, match="checkout_url"):
+        fo.ler_oto(_pasta(tmp_path / "y", checkout_url=""))
+
+
+def test_copy_abaixo_padrao_do_texto(tmp_path):
+    o = fo.ler_oto(_pasta(tmp_path, formato="texto", video="", texto="Oi."))
+    assert o["copy_abaixo"] == "Leia a mensagem acima até o final — seu acesso aparece em seguida."
+    o = fo.ler_oto(_pasta(tmp_path / "a", formato="texto", video="", texto="Oi.", copy_abaixo="Meu texto"))
+    assert o["copy_abaixo"] == "Meu texto"
+    assert fo.ler_oto(_pasta(tmp_path / "b"))["copy_abaixo"] == fo.PADROES["copy_abaixo"]
+
+
+def test_paleta_cadeia(tmp_path):
+    p = _pasta(tmp_path)
+    proj = p.parents[1]
+    assert fo._paleta_efetiva(p, "verde-branco") == "verde-branco"
+    assert fo._paleta_efetiva(p, "") == fo.PALETA_PADRAO
+    (proj / "oferta.md").write_text("---\nnome: X\npaleta: preto-dourado\n---\ncorpo\n", encoding="utf-8")
+    assert fo._paleta_efetiva(p, "") == "preto-dourado"
+    (proj / "pagina").mkdir()
+    (proj / "pagina" / "config.json").write_text(json.dumps({"paleta": "verde-branco"}))
+    assert fo._paleta_efetiva(p, "") == "verde-branco"
+    (proj / "oferta.md").write_text("---\n: quebrado [\n---\n", encoding="utf-8")
+    (proj / "pagina" / "config.json").write_text("{x")
+    assert fo._paleta_efetiva(p, "") == fo.PALETA_PADRAO
+
+
+def test_definir_url(tmp_path, capsys):
+    p = _pasta(tmp_path)
+    assert fo.main(["--pasta", str(p), "--definir-url", "http://x.com/a"]) == 1
+    assert "https" in capsys.readouterr().err
+    assert fo.main(["--pasta", str(p), "--definir-url", "https://a.netlify.app"]) == 0
+    assert json.loads((p / "config.json").read_text())["url"] == "https://a.netlify.app"
+    capsys.readouterr()
+    assert fo.main(["--pasta", str(p), "--definir-url", "https://b.netlify.app"]) == 0
+    out = capsys.readouterr().out
+    assert "O endereço mudou" in out and "atualize na plataforma" in out
+    assert json.loads((p / "config.json").read_text())["url"] == "https://b.netlify.app"
