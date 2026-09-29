@@ -8,7 +8,7 @@ Pra instalar:
   3. Abra um Terminal novo, digite claude e use os sistemas:
      /01-pesquisa-ofertas  /02-pagina-de-vendas  /03-entregaveis  /04-anuncios  /05-funil
 
-O passo a passo completo, com fotos do que aparece e soluções pros problemas mais comuns,
+O passo a passo completo, com o que aparece em cada etapa e soluções pros problemas mais comuns,
 está no COMO-INSTALAR.pdf.
 
 Pra atualizar: baixe o zip novo na área de membros e faça o mesmo. Suas chaves e seus projetos
