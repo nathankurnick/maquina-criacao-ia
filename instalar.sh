@@ -81,6 +81,7 @@ for pasta in "${MAQUINA_SKILLS_SRC:-$AQUI/skills}"/*/; do
   nome="$(basename "$pasta")"
   rm -rf "$SKILLS_DIR/$nome"
   cp -R "$pasta" "$SKILLS_DIR/$nome"
+  find "$SKILLS_DIR/$nome" -name __pycache__ -prune -exec rm -rf {} +
   echo "   ✔ skill /$nome"
 done
 
