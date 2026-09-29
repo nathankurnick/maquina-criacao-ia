@@ -8,11 +8,19 @@ import json
 import re
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
-PRECO = re.compile(r"R\$\s?\d{1,3}(?:\.\d{3})*(?:,\d{2})?")
-GARANTIA = re.compile(r"garantia[^.\n]{0,60}?\d+\s*dias", re.I)
-CHECKOUTS = ("hotmart", "kiwify", "payt", "eduzz", "monetizze", "perfectpay", "braip",
-             "ticto", "checkout", "pay.")
+PRECO = re.compile(r"R\$\s?(?:\d{1,3}(?:\.\d{3})+|\d+)(?:,\d{2})?")
+GARANTIA = re.compile(
+    r"garantia[^.\n]{0,60}?\d+\s*(?:\([^)\n]{0,20}\)\s*)?(?:dias|anos?|m[eê]s(?:es)?)\b"
+    r"|\d+\s*(?:\([^)\n]{0,20}\)\s*)?dias\s+de\s+garantia", re.I)
+DOMINIOS_CHECKOUT = ("hotmart.com", "kiwify.com.br", "kiwify.com", "payt.com.br", "eduzz.com",
+                     "monetizze.com.br", "perfectpay.com.br", "braip.com", "ticto.com.br")
+USER_AGENT_MOVEL = ("Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 "
+                    "(KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1")
+FATIA_ALTURA = 2400
+MAX_FATIAS = 20
+SAIDAS_ANTIGAS = ("dobra.png", "pagina.png", "pagina.txt", "dados.json")
 OFERTA_MANUAL = "Se preferir, mande prints e o texto da página que eu sigo com eles."
 
 
@@ -25,45 +33,90 @@ def _unicos(itens, limite=10):
     return saida[:limite]
 
 
+def _eh_checkout(link: str) -> bool:
+    try:
+        u = urlparse(link)
+    except ValueError:
+        return False
+    host = (u.hostname or "").lower()
+    if any(host == d or host.endswith("." + d) for d in DOMINIOS_CHECKOUT):
+        return True
+    if host.split(".")[0] in ("pay", "checkout") and "." in host:
+        return True
+    return "checkout" in [seg.lower() for seg in u.path.split("/")]
+
+
 def extrair_dados(texto: str, links: list[str]) -> dict:
     precos = _unicos(re.sub(r"R\$\s?", "R$ ", p) for p in PRECO.findall(texto or ""))
-    checkout = _unicos(l for l in links if any(c in l.lower() for c in CHECKOUTS))
+    checkout = _unicos(l for l in links if _eh_checkout(l))
     g = GARANTIA.search(texto or "")
     return {"precos": precos, "links_checkout": checkout, "garantia": g.group(0) if g else ""}
+
+
+def _limpar(saida: Path) -> None:
+    for nome in SAIDAS_ANTIGAS:
+        (saida / nome).unlink(missing_ok=True)
+    for f in saida.glob("pagina-*.png"):
+        f.unlink(missing_ok=True)
 
 
 def capturar(url: str, saida: Path) -> dict:
     from playwright.sync_api import sync_playwright
 
+    if not re.match(r"^[a-z][a-z0-9+.-]*://", url, re.I):
+        url = "https://" + url
     saida.mkdir(parents=True, exist_ok=True)
+    _limpar(saida)
     with sync_playwright() as p:
         navegador = p.chromium.launch(headless=True)
         try:
-            pagina = navegador.new_page(viewport={"width": 390, "height": 844}, device_scale_factor=2)
+            contexto = navegador.new_context(
+                viewport={"width": 390, "height": 844}, device_scale_factor=2,
+                is_mobile=True, has_touch=True, user_agent=USER_AGENT_MOVEL)
+            pagina = contexto.new_page()
+            pagina.goto(url, wait_until="load", timeout=45000)
             try:
-                pagina.goto(url, wait_until="networkidle", timeout=45000)
+                pagina.wait_for_load_state("networkidle", timeout=8000)
             except Exception:
-                pagina.goto(url, wait_until="domcontentloaded", timeout=45000)
-            pagina.wait_for_timeout(1500)
+                pass
+            for _ in range(60):  # rola até o fim pra disparar lazy-load
+                pos = pagina.evaluate("() => { window.scrollBy(0, 900); return "
+                                      "[window.scrollY + window.innerHeight, document.documentElement.scrollHeight]; }")
+                pagina.wait_for_timeout(150)
+                if pos[0] >= pos[1] - 2:
+                    break
+            pagina.evaluate("() => window.scrollTo(0, 0)")
+            pagina.wait_for_timeout(800)
+            altura = int(pagina.evaluate("() => document.documentElement.scrollHeight"))
             pagina.screenshot(path=str(saida / "dobra.png"))
-            pagina.screenshot(path=str(saida / "pagina.png"), full_page=True, scale="css")
+            prints = []
+            for i in range(min(MAX_FATIAS, max(1, -(-altura // FATIA_ALTURA)))):
+                y = i * FATIA_ALTURA
+                nome = f"pagina-{i + 1:02d}.png"
+                pagina.screenshot(path=str(saida / nome), full_page=True, scale="css",
+                                  clip={"x": 0, "y": y, "width": 390, "height": min(FATIA_ALTURA, altura - y)})
+                prints.append(nome)
             texto = pagina.inner_text("body")[:40000]
             links = pagina.eval_on_selector_all("a[href]", "els => els.map(e => e.href)")
             titulo = pagina.title()
+            url_final = pagina.url
         finally:
             try:
                 navegador.close()
             except Exception:  # não pode mascarar o erro original
                 pass
     (saida / "pagina.txt").write_text(texto, encoding="utf-8")
-    dados = {"url": url, "titulo": titulo, **extrair_dados(texto, links)}
+    dados = {"url": url, "url_final": url_final, "titulo": titulo, "altura": altura, "prints": prints,
+             **extrair_dados(texto, links)}
     (saida / "dados.json").write_text(json.dumps(dados, ensure_ascii=False, indent=2), encoding="utf-8")
     return dados
 
 
 def _mensagem_erro(e: BaseException) -> str:
     detalhe = str(e)
-    if isinstance(e, ImportError) or "Executable doesn't exist" in detalhe:
+    if "Download is starting" in detalhe:
+        causa = "esse link é um arquivo, não uma página."
+    elif isinstance(e, ImportError) or "Executable doesn't exist" in detalhe:
         causa = "O navegador da Máquina não está instalado. Rode o instalar.sh de novo."
     elif isinstance(e, TimeoutError) or any(t in detalhe for t in ("Timeout", "net::", "getaddrinfo")):
         causa = "a página não abriu (link quebrado, fora do ar ou internet)."
@@ -100,6 +153,7 @@ def main(argv: "list[str] | None" = None) -> int:
         sonda = saida / ".teste-escrita.tmp"
         sonda.write_text("ok")
         sonda.unlink()
+        _limpar(saida)
     except OSError:
         print(f"❌ Não consegui gravar na pasta de saída ({saida}). Escolha outra pasta. " + OFERTA_MANUAL,
               file=sys.stderr)
