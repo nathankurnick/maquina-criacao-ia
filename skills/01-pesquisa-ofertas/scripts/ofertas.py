@@ -150,6 +150,8 @@ def analisar(anuncios: list[dict], hoje: date) -> dict:
         if not chave:
             sem_link += 1
             continue
+        if chave in ("whatsapp.com/send", "wa.me", "whatsapp.com"):
+            chave = f"whatsapp:{a['pagina'] or '?'}"
         grupos.setdefault(chave, []).append((posicao, a))
 
     ofertas = []

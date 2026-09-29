@@ -212,3 +212,11 @@ def test_campos_de_tipo_errado_nao_quebram():
 ])
 def test_chave_whatsapp(link, chave):
     assert of.chave_oferta(link) == chave
+
+
+def test_whatsapp_sem_telefone_separa_por_anunciante():
+    def ad(i, pagina):
+        return {"id": str(i), "pagina": pagina, "link": "https://api.whatsapp.com/send",
+                "texto": f"texto {i}", "inicio": "2026-01-01"}
+    r = of.analisar([ad(1, "A"), ad(2, "B")], date(2026, 9, 1))
+    assert sorted(o["chave"] for o in r["ofertas"]) == ["whatsapp:A", "whatsapp:B"]

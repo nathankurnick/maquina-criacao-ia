@@ -1,7 +1,7 @@
 """Captura a página de vendas de uma oferta: prints (celular) + texto + dados básicos.
 
 Uso: python capturar.py --url <página> --saida <pasta>
-O Claude lê pagina.txt e dobra.png/pagina.png pra dissecar a oferta.
+O Claude lê pagina.txt e dobra.png/pagina-NN.png pra dissecar a oferta.
 """
 import argparse
 import json

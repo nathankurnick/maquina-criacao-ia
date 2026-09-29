@@ -1,4 +1,5 @@
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -36,7 +37,9 @@ def test_skill_md_nunca_manda_escrever_yaml_a_mao():
 
 
 def test_instalador_copia_skill_sem_pycache(tmp_path):
-    (SKILL / "scripts" / "__pycache__").mkdir(exist_ok=True)
+    src = tmp_path / "skills_src"
+    shutil.copytree(SKILL.parent, src, ignore=shutil.ignore_patterns("__pycache__"))
+    (src / SKILL.name / "scripts" / "__pycache__").mkdir(exist_ok=True)
     binfake = tmp_path / "bin"
     binfake.mkdir()
     (binfake / "python3.12").symlink_to(sys.executable)
@@ -45,7 +48,7 @@ def test_instalador_copia_skill_sem_pycache(tmp_path):
     casa = tmp_path / "casa"
     env = {"HOME": str(casa), "PATH": f"{binfake}:/usr/bin:/bin",
            "MAQUINA_HOME": str(casa / ".maquina"), "MAQUINA_BIN": str(casa / "b"),
-           "CLAUDE_SKILLS_DIR": str(casa / "skills"), "MAQUINA_PULAR_DEPS": "1", "MAQUINA_PY_DIRS": ""}
+           "CLAUDE_SKILLS_DIR": str(casa / "skills"), "MAQUINA_PULAR_DEPS": "1", "MAQUINA_SKILLS_SRC": str(src), "MAQUINA_PY_DIRS": ""}
     r = subprocess.run(["bash", str(RAIZ / "instalar.sh"), "--sem-chaves"], env=env,
                        capture_output=True, text=True, stdin=subprocess.DEVNULL)
     assert r.returncode == 0, r.stderr
