@@ -1,7 +1,7 @@
 # skills/02-pagina-de-vendas/scripts/pagina_render.py
 """Monta o site estático da página de vendas (template do Gerador) na pasta do aluno.
 
-Uso: python pagina_render.py --projeto <pasta do projeto>
+Uso: python pagina_render.py --projeto <pasta do projeto> [--pagina <pasta da página>]
 Lê <P>/pagina/conteudo.json, config.json e imagens/; recria <P>/pagina/site/.
 """
 import argparse
@@ -262,8 +262,8 @@ def _fotos(pasta: Path) -> list[Path]:
                   and not p.name.startswith("."))
 
 
-def montar_site(pasta_projeto: Path) -> "tuple[Path, list[str]]":
-    pagina = Path(pasta_projeto) / "pagina"
+def montar_site(pasta_projeto: Path, pasta_pagina: "Path | None" = None) -> "tuple[Path, list[str]]":
+    pagina = Path(pasta_pagina) if pasta_pagina else Path(pasta_projeto) / "pagina"
     arq = pagina / "conteudo.json"
     if not arq.exists():
         raise FileNotFoundError(f"Não achei {arq}. Escreva a copy (conteudo.json) antes de montar a página.")
@@ -335,12 +335,13 @@ def _montar(pagina, conteudo, config, avisos, site, novo):
 def main(argv: "list[str] | None" = None) -> int:
     ap = _Parser(description="Monta a página de vendas do projeto.")
     ap.add_argument("--projeto", required=True)
+    ap.add_argument("--pagina", default="")
     try:
         args = ap.parse_args(argv)
     except SystemExit as s:
         return int(s.code or 0)
     try:
-        index, avisos = montar_site(Path(args.projeto))
+        index, avisos = montar_site(Path(args.projeto), Path(args.pagina) if args.pagina else None)
     except (FileNotFoundError, ValueError) as err:
         print(f"❌ {err}", file=sys.stderr)
         return 1

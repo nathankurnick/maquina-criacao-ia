@@ -27,6 +27,7 @@ def _mostrar(config: dict) -> None:
 def main(argv: "list[str] | None" = None) -> int:
     ap = _Parser(description="Configura a página de vendas.")
     ap.add_argument("--projeto", required=True)
+    ap.add_argument("--pagina", default="")
     ap.add_argument("--definir", action="append", default=[])
     ap.add_argument("--head-arquivo", default="")
     ap.add_argument("--paletas", action="store_true")
@@ -48,7 +49,7 @@ def _executar(args) -> int:
             print(f"{chave}: {rotulo}")
         return 0
 
-    pasta = Path(args.projeto) / "pagina"
+    pasta = Path(args.pagina) if args.pagina else Path(args.projeto) / "pagina"
     try:
         config = ler_config(pasta)
         novos = {}

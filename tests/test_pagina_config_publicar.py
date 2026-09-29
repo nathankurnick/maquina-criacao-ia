@@ -6,6 +6,7 @@ import pytest
 import pagina_config
 import pagina_conteudo as pc
 import pagina_publicar
+import pagina_render
 from nucleo.netlify import NetlifyErro
 
 
@@ -89,11 +90,12 @@ def test_publicar_ok_salva_site_id_e_republica(ambiente, tmp_path, monkeypatch, 
     assert chamadas[1][2] == "s1"
 
 
-def test_publicar_sem_site_ou_sem_checkout(ambiente, tmp_path, monkeypatch, capsys):
+def test_publicar_sem_conteudo_ou_sem_checkout(ambiente, tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("NETLIFY_TOKEN", "tok")
     p = _proj(tmp_path, com_site=False)
+    (p / "pagina" / "conteudo.json").unlink()
     assert pagina_publicar.main(["--projeto", str(p)]) == 1
-    assert "pagina_render" in capsys.readouterr().err
+    assert "conteudo.json" in capsys.readouterr().err
     p2 = _proj(tmp_path / "b", checkout="")
     assert pagina_publicar.main(["--projeto", str(p2)]) == 1
     assert "checkout" in capsys.readouterr().err
@@ -222,3 +224,97 @@ def test_config_head_arquivo_binario_e_grande(tmp_path, capsys):
     assert pagina_config.main(["--projeto", str(p), "--head-arquivo", str(grande)]) == 1
     assert "100 KB" in capsys.readouterr().err
     assert pc.ler_config(p / "pagina")["head_html"] == ""
+
+
+def _fake_ok(monkeypatch, url="https://abc.netlify.app"):
+    monkeypatch.setenv("NETLIFY_TOKEN", "tok")
+    monkeypatch.setattr(pagina_publicar, "publicar_pasta",
+                        lambda t, pasta, site_id=None: {"site_id": "s1", "url": url})
+
+
+def test_publicar_avisa_quando_o_endereco_mudou(ambiente, tmp_path, monkeypatch, capsys):
+    p = _proj(tmp_path)
+    _fake_ok(monkeypatch, "https://novo.netlify.app")
+    pc.salvar_config(p / "pagina", dict(pc.CONFIG_PADRAO, url="https://velho.netlify.app"))
+    assert pagina_publicar.main(["--projeto", str(p)]) == 0
+    out = capsys.readouterr().out
+    assert ("⚠️ O endereço da página mudou: https://velho.netlify.app → https://novo.netlify.app. "
+            "Atualize o link nos seus anúncios.") in out
+
+
+def test_publicar_nao_avisa_se_endereco_igual_ou_primeira_vez(ambiente, tmp_path, monkeypatch, capsys):
+    p = _proj(tmp_path)
+    _fake_ok(monkeypatch)
+    pagina_publicar.main(["--projeto", str(p)])
+    assert "mudou" not in capsys.readouterr().out
+    pagina_publicar.main(["--projeto", str(p)])
+    assert "mudou" not in capsys.readouterr().out
+
+
+def test_config_definir_url_https_e_site_id_nao_editavel(tmp_path, capsys):
+    p = _proj(tmp_path)
+    assert pagina_config.main(["--projeto", str(p), "--definir", "url=https://x.netlify.app"]) == 0
+    assert pc.ler_config(p / "pagina")["url"] == "https://x.netlify.app"
+    assert pagina_config.main(["--projeto", str(p), "--definir", "url=http://x.com"]) == 1
+    assert pagina_config.main(["--projeto", str(p), "--definir", "site_id=abc"]) == 1
+    assert pc.ler_config(p / "pagina")["site_id"] == ""
+
+
+def test_exit3_instrucoes_login_antes_de_arrastar(ambiente, tmp_path, capsys):
+    p = _proj(tmp_path)
+    assert pagina_publicar.main(["--projeto", str(p)]) == 3
+    out = capsys.readouterr().out
+    assert "ANTES de arrastar" in out and "cerca de 1 hora" in out
+    assert out.index("1. Entre") < out.index("app.netlify.com/drop") < out.index("3. Arraste") < out.index("4. Copie")
+
+
+def test_publicar_remonta_antes_de_publicar(ambiente, tmp_path, monkeypatch):
+    p = _proj(tmp_path)
+    _fake_ok(monkeypatch)
+    vistos = []
+    monkeypatch.setattr(pagina_publicar, "publicar_pasta",
+                        lambda t, pasta, site_id=None: vistos.append((pasta / "index.html").read_text())
+                        or {"site_id": "s1", "url": "https://abc.netlify.app"})
+    pagina_render.main(["--projeto", str(p)])
+    (p / "pagina" / "conteudo.json").write_text(json.dumps(
+        {"hero": {"headline": "Headline Nova"}, "planos": {"basico": {"checkoutUrl": "https://c.com",
+                                                                        "precoPor": "R$ 9"}}}))
+    assert pagina_publicar.main(["--projeto", str(p)]) == 0
+    assert "Headline Nova" in vistos[0]
+
+
+def test_publicar_imprime_avisos_do_render(ambiente, tmp_path, monkeypatch, capsys):
+    p = _proj(tmp_path)
+    _fake_ok(monkeypatch)
+    assert pagina_publicar.main(["--projeto", str(p)]) == 0
+    assert "⚠️ depoimentos" in capsys.readouterr().out
+
+
+def test_publicar_falha_no_render_aborta_com_mensagem(ambiente, tmp_path, monkeypatch, capsys):
+    p = _proj(tmp_path)
+    _fake_ok(monkeypatch)
+    (p / "pagina" / "conteudo.json").write_text("{ quebrado")
+    assert pagina_publicar.main(["--projeto", str(p)]) == 1
+    assert "erro de formatação JSON" in capsys.readouterr().err
+
+
+def test_render_config_publicar_com_pasta_pagina_propria(ambiente, tmp_path, monkeypatch, capsys):
+    p = _proj(tmp_path)
+    up = p / "funil" / "upsell"
+    up.mkdir(parents=True)
+    (up / "conteudo.json").write_text(json.dumps(
+        {"hero": {"headline": "Upsell Legal"}, "planos": {"basico": {"checkoutUrl": "https://c.com/up",
+                                                                      "precoPor": "R$ 9"}}}))
+    assert pagina_config.main(["--projeto", str(p), "--pagina", str(up), "--definir", "paleta=verde-branco"]) == 0
+    assert pc.ler_config(up)["paleta"] == "verde-branco"
+    assert pc.ler_config(p / "pagina")["paleta"] == pc.PALETA_PADRAO
+    assert pagina_render.main(["--projeto", str(p), "--pagina", str(up)]) == 0
+    assert "Upsell Legal" in (up / "site" / "index.html").read_text()
+    vistos = []
+    monkeypatch.setenv("NETLIFY_TOKEN", "tok")
+    monkeypatch.setattr(pagina_publicar, "publicar_pasta",
+                        lambda t, pasta, site_id=None: vistos.append(pasta)
+                        or {"site_id": "u1", "url": "https://up.netlify.app"})
+    assert pagina_publicar.main(["--projeto", str(p), "--pagina", str(up)]) == 0
+    assert vistos == [up / "site"]
+    assert pc.ler_config(up)["site_id"] == "u1" and pc.ler_config(p / "pagina")["site_id"] == ""
