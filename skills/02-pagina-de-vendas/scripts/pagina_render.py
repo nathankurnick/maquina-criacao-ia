@@ -308,9 +308,20 @@ def _montar(pagina, conteudo, config, avisos, site, novo):
 
     index = novo / "index.html"
     index.write_text(render_html(conteudo, config, imagens, date.today().year), encoding="utf-8")
-    if site.exists():
-        shutil.rmtree(site)
-    novo.rename(site)
+    antigo = pagina / ".site-antigo"
+    if antigo.exists():
+        shutil.rmtree(antigo)
+    tinha_antigo = site.exists()
+    if tinha_antigo:
+        site.rename(antigo)
+    try:
+        novo.rename(site)
+    except BaseException:
+        if tinha_antigo:
+            antigo.rename(site)
+        raise
+    if tinha_antigo:
+        shutil.rmtree(antigo, ignore_errors=True)
     return site / "index.html", avisos
 
 

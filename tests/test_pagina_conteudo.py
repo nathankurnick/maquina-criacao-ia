@@ -163,3 +163,9 @@ def test_salvar_config_permissao_644(tmp_path):
 def test_validar_valor_nao_texto(valor):
     with pytest.raises(ValueError, match="texto"):
         pc.validar_valor("paleta", valor)
+
+
+def test_url_segura_rejeita_barra_invertida_apos_barra():
+    assert not pc.url_segura("/\\evil.com")
+    assert not pc.url_segura("//evil.com")
+    assert pc.url_segura("/obrigado")

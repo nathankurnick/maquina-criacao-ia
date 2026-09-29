@@ -105,7 +105,7 @@ def _titulo_descricao(v) -> dict:
 def url_segura(u: str) -> bool:
     u = (u or "").strip()
     return bool(re.match(r"(?i)https?://[^\s]+$", u) or re.match(r"#\S*$", u)
-                or (re.match(r"/(?!/)\S*$", u) is not None))
+                or (re.match(r"/(?![/\\])\S*$", u) is not None))
 
 
 def _plano(v, nome_padrao: str, ativo_padrao: bool, destaque: bool) -> dict:

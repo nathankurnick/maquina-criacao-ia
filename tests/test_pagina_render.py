@@ -249,3 +249,31 @@ def test_aspas_escapadas_em_atributos_e_texto():
     h = _html(conteudo=c)
     assert 'href="https://x.com/a&quot;onclick=&quot;y"' in h
     assert "Diga &quot;oi&quot;" in h and "Vai &quot;já&quot;" in h
+
+
+def test_troca_do_site_falha_no_segundo_rename_restaura_o_antigo(tmp_path, monkeypatch):
+    p = _projeto(tmp_path)
+    site = p / "pagina" / "site"
+    site.mkdir()
+    (site / "index.html").write_text("ANTIGO")
+    original = Path.rename
+
+    def rename(self, alvo):
+        if self.name == ".site-novo":
+            raise OSError("falhou")
+        return original(self, alvo)
+
+    monkeypatch.setattr(Path, "rename", rename)
+    with pytest.raises(OSError):
+        pr.montar_site(p)
+    assert (site / "index.html").read_text() == "ANTIGO"
+    assert not (p / "pagina" / ".site-antigo").exists()
+    assert not (p / "pagina" / ".site-novo").exists()
+
+
+def test_troca_do_site_nao_deixa_site_antigo(tmp_path):
+    p = _projeto(tmp_path)
+    pr.montar_site(p)
+    pr.montar_site(p)
+    assert not (p / "pagina" / ".site-antigo").exists()
+    assert (p / "pagina" / "site" / "index.html").exists()
