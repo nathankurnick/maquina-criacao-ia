@@ -36,7 +36,12 @@ def configurar_chaves(perguntar=input, imprimir=print) -> None:
         imprimir(f"\n🔑 {servico} — serve pra {uso} ({situacao}).")
         imprimir(f"   Onde pegar: {onde}")
         for _ in range(3):
-            valor = perguntar(f"   Cole a chave da {servico} (ou Enter pra pular): ").strip()
+            try:
+                valor = perguntar(f"   Cole a chave da {servico} (ou Enter pra pular): ").strip()
+            except EOFError:
+                raise MaquinaErro(
+                    "Não consegui ler sua resposta aqui. Abra o Terminal e rode "
+                    "`maquina chaves` direto lá.") from None
             if not valor:
                 imprimir("   Pulado. Sem ela, esse recurso funciona no modo manual.")
                 break
@@ -57,6 +62,10 @@ def _chaves(a) -> int:
 
 def _projeto(a) -> int:
     from nucleo.projeto import abrir_projeto, criar_projeto, listar_projetos
+    if a.acao == "novo" and not a.valor:
+        raise MaquinaErro("Faltou o nome do projeto.")
+    if a.acao == "caminho" and not a.valor:
+        raise MaquinaErro("Faltou o nome (slug) do projeto. Veja com: maquina projeto listar")
     if a.acao == "novo":
         print(criar_projeto(a.valor))
     elif a.acao == "listar":
@@ -98,6 +107,9 @@ def main(argv: "list[str] | None" = None) -> int:
     except MaquinaErro as e:
         print(f"❌ {e}", file=sys.stderr)
         return 1
+    except KeyboardInterrupt:
+        print("\nCancelado.", file=sys.stderr)
+        return 130
     except Exception:
         log = registrar_log(traceback.format_exc())
         print(f"❌ Algo deu errado. Mande este arquivo pro suporte: {log}", file=sys.stderr)

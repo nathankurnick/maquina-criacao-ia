@@ -53,3 +53,37 @@ def test_erro_inesperado_vai_pro_log(ambiente, monkeypatch, capsys):
     err = capsys.readouterr().err
     assert "Algo deu errado" in err and "Traceback" not in err
     assert "ZeroDivisionError" in (ambiente / "home" / "log" / "maquina.log").read_text()
+
+
+def test_ctrl_c_cancela_sem_traceback(ambiente, monkeypatch, capsys):
+    def _boom(a):
+        raise KeyboardInterrupt
+    monkeypatch.setattr(cli, "_projeto", _boom)
+    assert cli.main(["projeto", "listar"]) == 130
+    err = capsys.readouterr().err
+    assert "Cancelado." in err and "Traceback" not in err
+
+
+def test_chaves_eof_mensagem_amigavel(ambiente, monkeypatch, capsys):
+    def _eof(_):
+        raise EOFError
+    monkeypatch.setattr(cli.configurar_chaves, "__defaults__", (_eof, print))
+    assert cli.main(["chaves"]) == 1
+    err = capsys.readouterr().err
+    assert "terminal" in err.lower() and "suporte" not in err and "Traceback" not in err
+    assert not (ambiente / "home" / "log" / "maquina.log").exists()
+
+
+def test_configurar_chaves_eof_vira_maquina_erro(ambiente):
+    def _eof(_):
+        raise EOFError
+    import pytest
+    with pytest.raises(cli.MaquinaErro):
+        cli.configurar_chaves(perguntar=_eof, imprimir=lambda s: None)
+
+
+def test_projeto_novo_e_caminho_sem_valor(ambiente, capsys):
+    assert cli.main(["projeto", "novo"]) == 1
+    assert "Faltou o nome do projeto." in capsys.readouterr().err
+    assert cli.main(["projeto", "caminho"]) == 1
+    assert "Faltou o nome (slug) do projeto" in capsys.readouterr().err

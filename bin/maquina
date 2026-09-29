@@ -3,4 +3,8 @@
 MAQUINA_HOME="${MAQUINA_HOME:-$HOME/.maquina}"
 export MAQUINA_HOME
 export PYTHONPATH="$MAQUINA_HOME${PYTHONPATH:+:$PYTHONPATH}"
+if [ ! -x "$MAQUINA_HOME/venv/bin/python" ]; then
+  echo "❌ A Máquina não está instalada direito. Rode o instalar.sh de novo." >&2
+  exit 1
+fi
 exec "$MAQUINA_HOME/venv/bin/python" -m nucleo.cli "$@"
