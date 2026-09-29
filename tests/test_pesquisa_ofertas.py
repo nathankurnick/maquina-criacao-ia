@@ -27,7 +27,7 @@ def _ad(aid, link="https://loja.com/a", texto="Copy grande o suficiente", pagina
     ("loja.com.br/x", "loja.com.br"),
     ("https://pay.kiwify.com.br/AbC123?x", "kiwify.com.br/AbC123"),
     ("https://go.hotmart.com/Q123/", "hotmart.com/Q123"),
-    ("https://wa.me/5511999999999", "wa.me/5511999999999"),
+    ("https://wa.me/5511999999999", "whatsapp/5511999999999"),
     ("https://l.facebook.com/l.php?u=https%3A%2F%2Floja.com%2Fp&h=x", "loja.com"),
     ("https://www.facebook.com/pagina", None),
     ("https://instagram.com/x", None),
@@ -206,9 +206,9 @@ def test_campos_de_tipo_errado_nao_quebram():
 
 
 @pytest.mark.parametrize("link,chave", [
-    ("https://api.whatsapp.com/send?phone=5511999&text=oi", "whatsapp.com/5511999"),
-    ("https://api.whatsapp.com/send", "whatsapp.com/send"),
-    ("https://wa.me/5511999", "wa.me/5511999"),
+    ("https://api.whatsapp.com/send?phone=5511999999&text=oi", "whatsapp/5511999999"),
+    ("https://api.whatsapp.com/send", "whatsapp:"),
+    ("https://wa.me/5511999999", "whatsapp/5511999999"),
 ])
 def test_chave_whatsapp(link, chave):
     assert of.chave_oferta(link) == chave
@@ -227,3 +227,81 @@ def test_whatsapp_sem_pagina_nao_junta_anuncios():
         return {"id": str(i), "pagina": "", "link": "https://wa.me/", "texto": f"t{i}", "inicio": "2026-01-01"}
     r = of.analisar([ad(1), ad(2)], date(2026, 9, 1))
     assert sorted(o["chave"] for o in r["ofertas"]) == ["whatsapp:?1", "whatsapp:?2"]
+
+
+def test_hosts_compartilhados_nao_juntam_anunciantes_diferentes():
+    anuncios = [_ad(str(i), link=f"https://www.youtube.com/watch?v={i}", pagina=f"Canal {i}",
+                    texto=f"texto do anuncio {i}") for i in range(25)]
+    r = of.analisar(anuncios, HOJE)
+    assert len(r["ofertas"]) == 25
+    assert all(o["chave"].startswith("youtube:Canal ") for o in r["ofertas"])
+
+
+@pytest.mark.parametrize("link,prefixo", [
+    ("https://youtu.be/abc", "youtube:"), ("https://m.youtube.com/watch?v=1", "youtube:"),
+    ("https://t.me/canal", "telegram:"), ("https://m.me/pagina", "messenger:"),
+    ("https://www.messenger.com/t/x", "messenger:"), ("https://docs.google.com/forms/d/1", "google:"),
+    ("https://forms.gle/xyz", "google:"), ("https://sites.google.com/view/x", "google:"),
+    ("https://drive.google.com/file/d/1", "google:"),
+])
+def test_chave_hosts_compartilhados(link, prefixo):
+    assert of.chave_oferta(link) == prefixo
+
+
+def test_host_compartilhado_sem_pagina_usa_id():
+    a = {"id": "77", "pagina": "", "link": "https://t.me/x", "texto": "texto suficiente aqui"}
+    assert of.analisar([a], HOJE)["ofertas"][0]["chave"] == "telegram:?77"
+
+
+def test_whatsapp_normaliza_telefone_em_todas_as_formas():
+    links = ["https://wa.me/5511987654321", "https://api.whatsapp.com/send?phone=%2B55%2011%2098765-4321",
+             "https://api.whatsapp.com/send?phone=5511987654321&text=oi", "https://whatsapp.com/5511987654321",
+             "https://wa.me/+55 11 98765-4321"]
+    assert {of.chave_oferta(l) for l in links} == {"whatsapp/5511987654321"}
+    anuncios = [_ad(str(i), link=l, pagina=f"P{i}") for i, l in enumerate(links)]
+    assert len(of.analisar(anuncios, HOJE)["ofertas"]) == 1
+
+
+def test_plataforma_so_com_locale_vira_host_compartilhado():
+    assert of.chave_oferta("https://hotmart.com/pt-br") == "hotmart:"
+    assert of.chave_oferta("https://hotmart.com/") == "hotmart:"
+    anuncios = [_ad("1", link="https://hotmart.com/pt-br", pagina="A"),
+                _ad("2", link="https://hotmart.com/pt-br", pagina="B")]
+    assert sorted(o["chave"] for o in of.analisar(anuncios, HOJE)["ofertas"]) == ["hotmart:A", "hotmart:B"]
+
+
+def test_oferta_traz_ids_na_ordem_de_captura():
+    anuncios = [_ad("9", link="https://a.com/x"), _ad("3", link="https://a.com/y"), _ad("5", link="https://b.com")]
+    o = of.analisar(anuncios, HOJE)["ofertas"]
+    assert [x["ids"] for x in o if x["chave"] == "a.com"] == [["9", "3"]]
+
+
+def test_zero_ofertas_sai_2_e_grava_arquivos(tmp_path, capsys):
+    e = tmp_path / "a.json"
+    e.write_text(json.dumps([_ad("1", link="", texto="anuncio sem link nenhum")]))
+    saida = tmp_path / "o"
+    assert of.main([str(e), "--saida", str(saida), "--hoje", "2026-09-28"]) == 2
+    assert "Nenhuma oferta com página de vendas" in capsys.readouterr().err
+    assert json.loads((saida / "ofertas.json").read_text())["ofertas"] == []
+    assert (saida / "ofertas.md").exists()
+
+
+def test_argparse_em_portugues(capsys):
+    assert of.main([]) == 1
+    err = capsys.readouterr().err
+    assert "Comando inválido" in err and "usage" not in err.lower()
+    assert of.main(["a.json", "--saida"]) == 1
+    assert of.main(["a.json", "--saida", "x", "--foo"]) == 1
+
+
+def test_erro_ao_gravar_saida_e_amigavel_e_vai_pro_log(tmp_path, capsys, monkeypatch):
+    home = tmp_path / "home"
+    monkeypatch.setenv("MAQUINA_HOME", str(home))
+    e = tmp_path / "a.json"
+    e.write_text(json.dumps([_ad("1")]))
+    arquivo = tmp_path / "arquivo"
+    arquivo.write_text("x")
+    assert of.main([str(e), "--saida", str(arquivo / "sub")]) == 1
+    err = capsys.readouterr().err
+    assert "Não consegui gravar" in err and "Traceback" not in err
+    assert "Traceback" in (home / "log" / "maquina.log").read_text()

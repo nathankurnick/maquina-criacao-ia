@@ -5,12 +5,14 @@ Uso: python ofertas.py <anuncios.json> --saida <pasta> [--hoje AAAA-MM-DD]
 """
 import argparse
 import json
+import os
 import re
 import sys
+import traceback
 from collections import Counter
 from datetime import date, datetime, timezone
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 PLATAFORMAS = (
     "hotmart.com", "kiwify.com.br", "kiwify.com", "payt.com.br", "eduzz.com",
@@ -21,10 +23,33 @@ ENCURTADORES = (
     "bit.ly", "tinyurl.com", "is.gd", "cutt.ly", "encurtador.com.br", "abre.ai",
     "rb.gy", "t.co", "linktr.ee",
 )
+# Hosts onde muitos anunciantes diferentes compartilham o mesmo endereço: a oferta é <tipo>:<página>.
+HOSTS_COMPARTILHADOS = (
+    ("youtube.com", "youtube"), ("youtu.be", "youtube"), ("t.me", "telegram"),
+    ("m.me", "messenger"), ("messenger.com", "messenger"), ("forms.gle", "google"),
+    ("docs.google.com", "google"), ("sites.google.com", "google"), ("drive.google.com", "google"),
+)
 _LOCALES = {"pt-br", "pt", "en", "es", "en-us", "es-es"}
 _GENERICOS = {"marketplace", "produtos", "product", "p"}
 _IGNORAR_SEGMENTO = _LOCALES | _GENERICOS
 _TRACKER = re.compile(r"(^|\.)(trk|track|tracking)\.|\.(site|click|info)$")
+
+
+def _log_tecnico(e: BaseException) -> None:
+    """Grava o traceback completo em ~/.maquina/log/maquina.log. Nunca levanta erro."""
+    try:
+        base = Path(os.environ.get("MAQUINA_HOME") or Path.home() / ".maquina") / "log"
+        base.mkdir(parents=True, exist_ok=True)
+        with (base / "maquina.log").open("a", encoding="utf-8") as f:
+            f.write(f"[{datetime.now().isoformat(timespec='seconds')}] ofertas.py\n")
+            f.write("".join(traceback.format_exception(type(e), e, e.__traceback__)) + "\n")
+    except Exception:
+        pass
+
+
+def _telefone(texto: str) -> str:
+    digitos = re.sub(r"\D", "", unquote(texto or ""))
+    return digitos if len(digitos) >= 8 else ""
 
 
 def _host(link: str):
@@ -47,17 +72,21 @@ def chave_oferta(link: str) -> "str | None":
         return chave_oferta(alvo) if alvo else None
     if not host or host.endswith(("facebook.com", "instagram.com", "fb.me", "fb.com")):
         return None
-    partes = [x for x in u.path.split("/") if x]
+    partes = [unquote(x) for x in u.path.split("/") if x]
+    if host == "wa.me" or host == "whatsapp.com" or host.endswith(".whatsapp.com"):
+        fone = _telefone(parse_qs(u.query).get("phone", [""])[0]) if partes[:1] == ["send"] or not partes \
+            else _telefone(partes[0])
+        return f"whatsapp/{fone}" if fone else "whatsapp:"
+    for h, tipo in HOSTS_COMPARTILHADOS:
+        if host == h or host.endswith("." + h):
+            return f"{tipo}:"
     for e in ENCURTADORES:
         if host == e or host.endswith("." + e):
             return f"{host}/{partes[0]}" if partes else host
     for p in PLATAFORMAS:
         if host == p or host.endswith("." + p):
-            if p == "whatsapp.com" and partes[:1] == ["send"]:
-                fone = parse_qs(u.query).get("phone", [""])[0].strip()
-                return f"{p}/{fone}" if fone else f"{p}/send"
             segmento = next((x for x in partes if x.lower() not in _IGNORAR_SEGMENTO), "")
-            return f"{p}/{segmento}" if segmento else p
+            return f"{p}/{segmento}" if segmento else f"{p.split('.')[0]}:"
     return host
 
 
@@ -150,8 +179,8 @@ def analisar(anuncios: list[dict], hoje: date) -> dict:
         if not chave:
             sem_link += 1
             continue
-        if chave in ("whatsapp.com/send", "wa.me", "whatsapp.com"):
-            chave = f"whatsapp:{a['pagina'] or '?' + str(a['id'])}"
+        if chave.endswith(":"):  # host compartilhado: separa por anunciante
+            chave += a["pagina"] or "?" + str(a["id"])
         grupos.setdefault(chave, []).append((posicao, a))
 
     ofertas = []
@@ -171,7 +200,7 @@ def analisar(anuncios: list[dict], hoje: date) -> dict:
             "chave": chave, "anunciantes": anunciantes, "anuncios": len(lista),
             "criativos": len(criativos), "volume": volume, "dias": dias_max,
             "midia": _midia(lista), "link": lista[0].get("link") or "",
-            "posicao": itens[0][0], "textos": textos,
+            "posicao": itens[0][0], "textos": textos, "ids": [str(a["id"]) for a in lista],
             "pontuacao": pontuacao, "selo": selo,
         })
     ofertas.sort(key=lambda o: (-o["pontuacao"], o["posicao"]))
@@ -197,18 +226,39 @@ def tabela_markdown(ofertas: list[dict], limite: int = 10) -> str:
     return "\n".join(linhas) + "\n"
 
 
+NENHUMA_OFERTA = ("❌ Nenhuma oferta com página de vendas nessa busca (só anúncios sem link ou de mensagem). "
+                  "Tente outro termo, --dominio de um concorrente, ou o modo manual.")
+
+
+class _Parser(argparse.ArgumentParser):
+    def error(self, message):
+        if "required" in message:
+            message = "faltou informar o arquivo de anúncios e a pasta de saída (--saida)"
+        elif "expected one argument" in message:
+            message = "faltou o valor de uma opção (" + message.split(":")[0].replace("argument ", "") + ")"
+        else:
+            message = "opção não reconhecida"
+        print(f"❌ Comando inválido: {message}. Use: ofertas.py <anuncios.json> --saida <pasta>.",
+              file=sys.stderr)
+        raise SystemExit(1)
+
+
 def main(argv: "list[str] | None" = None) -> int:
-    ap = argparse.ArgumentParser(description="Ranqueia ofertas a partir dos anúncios raspados.")
+    ap = _Parser(description="Ranqueia ofertas a partir dos anúncios raspados.")
     ap.add_argument("anuncios")
     ap.add_argument("--saida", required=True)
     ap.add_argument("--hoje", default="")
-    args = ap.parse_args(argv)
+    try:
+        args = ap.parse_args(argv)
+    except SystemExit as e:
+        return 0 if e.code in (0, None) else 1
     try:
         anuncios = json.loads(Path(args.anuncios).read_text(encoding="utf-8"))
         if not isinstance(anuncios, list):
             raise ValueError("não é uma lista")
     except (OSError, ValueError) as e:
-        print(f"❌ Não consegui ler {args.anuncios} ({e}). Rode a raspagem de novo.", file=sys.stderr)
+        _log_tecnico(e)
+        print(f"❌ Não consegui ler {args.anuncios} ({type(e).__name__}). Rode a raspagem de novo.", file=sys.stderr)
         return 1
     try:
         hoje = date.fromisoformat(args.hoje) if args.hoje else date.today()
@@ -216,12 +266,27 @@ def main(argv: "list[str] | None" = None) -> int:
         print(f"❌ Data inválida em --hoje: '{args.hoje}'. Use o formato AAAA-MM-DD, por exemplo 2026-09-28.",
               file=sys.stderr)
         return 1
-    resultado = analisar(anuncios, hoje)
+    try:
+        resultado = analisar(anuncios, hoje)
+    except Exception as e:
+        _log_tecnico(e)
+        print(f"❌ Não consegui agrupar os anúncios ({type(e).__name__}). Rode a raspagem de novo ou use "
+              "o modo manual.", file=sys.stderr)
+        return 1
     saida = Path(args.saida)
-    saida.mkdir(parents=True, exist_ok=True)
-    (saida / "ofertas.json").write_text(json.dumps(resultado, ensure_ascii=False, indent=2), encoding="utf-8")
     tabela = tabela_markdown(resultado["ofertas"])
-    (saida / "ofertas.md").write_text(tabela, encoding="utf-8")
+    try:
+        saida.mkdir(parents=True, exist_ok=True)
+        (saida / "ofertas.json").write_text(json.dumps(resultado, ensure_ascii=False, indent=2), encoding="utf-8")
+        (saida / "ofertas.md").write_text(tabela, encoding="utf-8")
+    except OSError as e:
+        _log_tecnico(e)
+        print(f"❌ Não consegui gravar os resultados em {saida}. Escolha outra pasta e verifique o espaço "
+              "no disco.", file=sys.stderr)
+        return 1
+    if not resultado["ofertas"]:
+        print(NENHUMA_OFERTA, file=sys.stderr)
+        return 2
     print(tabela)
     print(f"{resultado['total_anuncios']} anúncios lidos · {len(resultado['ofertas'])} ofertas · "
           f"{resultado['descartados_isca']} iscas descartadas · {resultado['sem_link']} sem link"
