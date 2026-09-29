@@ -31,6 +31,14 @@ existirem: `<P>/pagina/conteudo.json` (preço e promessa NO AR), `<P>/pagina/con
 (`paleta`, `url`) e a lista de `<P>/entregaveis/`. Leia `referencias/upsell/metodologia.md` e
 `referencias/upsell/caso-exemplo.md` antes de propor qualquer upsell.
 
+## Fase 0 — Briefing do produto principal
+
+Antes de propor qualquer coisa, anote (pergunte ao aluno o que não estiver na oferta/página):
+a **garantia** do front, a **nova oportunidade / solução única** dele, o **escudo moral** (por que
+é certo vender isso) e qualquer **restrição de obra de terceiros** (nunca citar a obra/autor na
+copy). O `front.preco` do `funil.json` precisa ser IGUAL ao preço que está no ar
+(`pagina/conteudo.json`) e na oferta.
+
 ## Passo 2 — Esteira de ofertas ✋ CHECKPOINT
 
 Pela pergunta-mestra do método ("qual é a próxima etapa lógica?"), proponha:
@@ -45,7 +53,7 @@ Pare e espere o aluno escolher. Depois grave `<P>/funil/funil.json` (crie a past
 ```json
 {"front":    {"nome": "Marmitas Já", "preco": 27},
  "bump":     {"nome": "Lista de compras inteligente", "preco": 9.9, "conversao": 0.2},
- "upsell":   {"nome": "Cardápio 30 dias", "preco": 67, "conversao": 0.10},
+ "upsell":   {"nome": "Cardápio 30 dias", "preco": 72, "conversao": 0.10},
  "downsell": {"nome": "Cardápio 15 dias", "preco": 37, "conversao": 0.10}}
 ```
 
@@ -67,18 +75,21 @@ Desenhe o mapa (a paleta vem do argumento `--paleta`, senão do `pagina/config.j
 PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/05-funil/scripts"; "$PY" "$S/funil_mapa.py" --projeto "<P>"
 ```
 
-Abra e mostre `<P>/funil/mapa.png` (e, se quiser, o `mapa.html` ao lado) e o ticket médio
-projetado. O resumo do mapa classifica o aumento sobre o produto principal: abaixo de 25% é
-"abaixo da meta"; de 25% a 30% é "dentro da meta"; acima de 30% é "acima da meta" e o mapa pede
-para conferir se as conversões não estão otimistas. Conversão fora da faixa de referência de
-mercado ganha o aviso "⚠️ fora da referência" ao lado da caixa da oferta. Os números são
+Abra e mostre `<P>/funil/mapa.png` (e, se quiser, o `mapa.html` ao lado). O mapa mostra o ticket
+médio projetado (produto + bump + upsell + downsell) e o aumento total, SEM rótulo de meta. A meta
+do método vale só para o UPSELL (conversão do upsell × ticket do upsell ÷ preço do produto
+principal): abaixo de 25% é "abaixo da meta"; de 25% a 30% é "dentro da meta"; acima de 30% é
+"acima da meta" e o mapa pede para conferir se as conversões não estão otimistas. Conversão fora
+da faixa de referência de mercado ganha o aviso "⚠️ fora da referência" ao lado da caixa da
+oferta. Os números são
 referência — o aluno troca pelos dele quando tiver dados. Saída 0: ok. Saída 1: mostre a
 mensagem e corrija o `funil.json`. Saída 130: o aluno cancelou (Ctrl+C), sem problema.
 
 ## Passo 3 — Order bump
 
-Escreva `<P>/funil/order-bump.md` (nome, preço, copy do checkout). O conteúdo do bump é
-produzido no Sistema 03 (`/03-entregaveis`) como um bônus.
+Escreva `<P>/funil/order-bump.md` (nome, preço, copy do checkout). O conteúdo do bump é um
+produto SEPARADO: siga `referencias/order-bump.md` (pasta `<P>/funil/bump/entregaveis/<item>/`,
+nunca `maquina oferta adicionar`, nunca `--carrossel`).
 
 ## Passo 4 — Upsell (e downsell) pelo método ✋ CHECKPOINTS
 
@@ -91,14 +102,34 @@ Siga o método em `referencias/upsell/metodologia.md`:
    executar. A IA não inventa relato, depoimento, número de alunos nem resultado.
 3. **Copy dos 5 blocos** ✋ (`referencias/upsell/copy-5-blocos.md`) em `<P>/funil/upsell/roteiro.md`
    (vídeo: roteiro pra gravar e subir no VTurb/YouTube; ou texto). Espere a revisão.
-4. **Conteúdo do upsell**: produza no Sistema 03 (`/03-entregaveis`).
+4. **Conteúdo do upsell** (produto SEPARADO, nunca dentro do front): escreva com as regras de
+   formato do Sistema 03, mas em `<P>/funil/upsell/entregaveis/<item>/`, passando `--pasta` para lá.
+   Nunca use `maquina oferta adicionar` para isso e nunca `--carrossel`. O aluno sobe cada PDF
+   na plataforma como um produto separado.
+
+```bash
+PY="$HOME/.maquina/venv/bin/python"; S3="$HOME/.claude/skills/03-entregaveis/scripts"; "$PY" "$S3/entregavel_pdf.py" --pasta "<P>/funil/upsell/entregaveis/<item>" --paleta '<paleta>'
+```
+
+```bash
+PY="$HOME/.maquina/venv/bin/python"; S3="$HOME/.claude/skills/03-entregaveis/scripts"; "$PY" "$S3/entregavel_capa.py" --pasta "<P>/funil/upsell/entregaveis/<item>" --paleta '<paleta>' --arte '<descrição visual, sem texto>'
+```
+
+**Ordem de construção**: faça o DOWNSELL primeiro (se houver). O `recusar_url` do downsell é a página
+de obrigado ou a área de membros da plataforma: PERGUNTE o link ao aluno. Publique o downsell; só
+então monte o upsell com `recusar_url` = link do downsell. Sem downsell, o `recusar_url` do upsell
+é o link de obrigado/área de membros. O `recusar_url` é obrigatório (o script recusa sem ele).
+
+**Prova (4.3 da copy)**: no caso-exemplo os relatos e números eram reais. Sem relato real, use a
+lacuna entre saber e executar ou `[cole aqui um relato real de cliente]`; custo do problema ou
+estatística → "(confirme esta informação)". A IA nunca inventa prova.
 
 Página do upsell — escreva `<P>/funil/upsell/oto.json`:
 
 ```json
 {"formato": "video", "video": "<link do YouTube/Vimeo ou o código do player do VTurb>",
- "checkout_url": "<link de pagamento do upsell na plataforma>", "atraso_segundos": 0,
- "recusar_url": "<link da página de downsell ou de obrigado>"}
+ "checkout_url": "<link de pagamento do upsell na plataforma>", "atraso_segundos": 45,
+ "recusar_url": "<link do downsell (publicado antes) ou da página de obrigado / área de membros>"}
 ```
 
 - `video`: link do YouTube (watch, youtu.be, /embed/, /shorts/, /live/), link do Vimeo (inclusive
@@ -106,10 +137,15 @@ Página do upsell — escreva `<P>/funil/upsell/oto.json`:
 - `pre_headline`, `headline`, `copy_abaixo`, `botao_texto`, `recusar_texto` já vêm com o texto
   do método; só inclua se quiser mudar.
 - `formato: "texto"` + campo `texto` (parágrafos separados por linha em branco) pra upsell em texto.
+- `botao_no_player: true`: para players (VTurb) cujo botão aparece DENTRO do vídeo; a página não
+  desenha botão próprio (só o "não, obrigado") e `checkout_url` deixa de ser obrigatório.
 - `botao_html`: se a plataforma der um botão de compra em 1 clique, cole o código aqui (aí o
   `checkout_url` não é obrigatório).
-- `atraso_segundos`: o botão aparece depois desse tempo (o método sugere ~60–70% do vídeo quando
-  o objetivo é ticket médio). Se o player (VTurb) já controla o botão, deixe 0.
+- `atraso_segundos`: o botão aparece depois desse tempo: use ≈ 60–70% da duração do vídeo (nunca
+  0 no formato vídeo). Se o botão estiver dentro do player, use `botao_no_player` em vez disso.
+- Formato `texto`: `copy_abaixo` já vem como "Leia a mensagem acima até o final — seu acesso
+  aparece em seguida.".
+- Paleta: `--paleta`, senão `pagina/config.json`, senão a do `oferta.md`, senão `azul-laranja`.
 
 O comando sempre monta a pasta `site/` (`<P>/funil/upsell/site/index.html`); só publica com
 `--publicar`. Monte, olhe e publique:
@@ -137,13 +173,29 @@ PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/05-funil/scripts"; 
   endereço salvo: entrar (ou criar conta) na Netlify ANTES, senão a página some em cerca de 1
   hora; abrir app.netlify.com/drop e arrastar a pasta `site`; copiar o link e mandar pra você.
   Se a página já tem endereço salvo, o script avisa para atualizar SEM mudar o endereço: abrir o
-  site na Netlify, aba Deploys, e arrastar a pasta `site` lá. O aluno roda `maquina chaves` no
-  Terminal dele se quiser publicar sozinho (é interativo).
+  site na Netlify, aba Deploys, e arrastar a pasta `site` lá. Depois do Drop, SALVE o
+  link que o aluno mandar (o script guarda em `config.json` e avisa se mudou):
+
+```bash
+PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/05-funil/scripts"; "$PY" "$S/funil_oto.py" --pasta "<P>/funil/upsell" --definir-url 'https://<link-do-aluno>'
+```
+
+  Avise: se depois ele passar a publicar com chave (`maquina chaves`, interativo), a Netlify cria um
+  endereço NOVO e ele terá de atualizar o link na plataforma.
 - Saída 1: mostre a mensagem (link de compra inválido, vídeo não reconhecido…) e corrija.
 - Saída 130: o aluno cancelou (Ctrl+C).
 
-Downsell: repita tudo em `<P>/funil/downsell/` (oferta menor, mesma estrutura de página). O
-`recusar_url` do upsell aponta pro link do downsell.
+Downsell (construído ANTES do upsell): repita em `<P>/funil/downsell/`. Ele reaproveita a estrutura
+do roteiro do upsell num texto de página mais curto (formato `texto`), com a justificativa da queda
+de preço; não faça nova rodada de 12–17 nomes, a menos que o aluno queira. Conteúdo em
+`<P>/funil/downsell/entregaveis/<item>/`, como produto separado (mesmas regras).
+
+Reedição: o texto de um upsell em `texto` mora em `oto.json` (campo `texto`); o `roteiro.md` é a
+fonte: atualize os dois. Em vídeo, a página só muda se mudar headline ou links. Rodar
+`--publicar` de novo mantém o mesmo endereço.
+
+Checklist do vídeo (VTurb/YouTube): desligue o autoplay e use como thumbnail o elemento
+"Thumbnail" do roteiro.
 
 ## Passo 5 — Mensagens
 

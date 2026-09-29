@@ -57,3 +57,30 @@ def test_exemplo_do_funil_json_e_valido(tmp_path):
     exemplo = re.search(r"```json\n(\{.*?\"front\".*?)```", _texto(), re.S).group(1)
     (tmp_path / "funil.json").write_text(exemplo, encoding="utf-8")
     assert funil_dados.ler_funil(tmp_path)["upsell"]
+
+
+def test_regras_novas_no_texto():
+    t = _texto()
+    for trecho in ("botao_no_player", "--definir-url", "recusar_url", "entregaveis/<item>",
+                   "Fase 0", "Thumbnail", "confirme esta informação", "S3=", "DOWNSELL primeiro"):
+        assert trecho in t, trecho
+    assert not re.search(r"```bash\n[^`]*maquina oferta adicionar[^`]*funil", t)
+
+
+def test_exemplo_do_upsell_dentro_da_meta(tmp_path):
+    exemplo = re.search(r"```json\n(\{.*?\"front\".*?)```", _texto(), re.S).group(1)
+    (tmp_path / "funil.json").write_text(exemplo, encoding="utf-8")
+    f = funil_dados.ler_funil(tmp_path)
+    p = funil_dados.projetar(f)
+    assert 25 <= p["aumento_upsell_pct"] <= 30
+    assert f["upsell"]["preco"] >= 2.5 * f["front"]["preco"]
+
+
+def test_exemplo_do_oto_json_e_valido(tmp_path):
+    import funil_oto
+    exemplo = re.search(r"```json\n(\{\"formato\".*?)```", _texto(), re.S).group(1)
+    exemplo = exemplo.replace("<link do YouTube/Vimeo ou o código do player do VTurb>", "https://youtu.be/abcDEF12345") \
+        .replace("<link de pagamento do upsell na plataforma>", "https://pay.x.com/up") \
+        .replace("<link do downsell (publicado antes) ou da página de obrigado / área de membros>", "https://x.com/ok")
+    (tmp_path / "oto.json").write_text(exemplo, encoding="utf-8")
+    assert funil_oto.ler_oto(tmp_path)["atraso_segundos"] > 0

@@ -12,9 +12,14 @@ de alunos, resultado): só o que é real.
   do aluno enviar WhatsApp e a pessoa tiver informado o número.
 
 ## 2. Boleto/PIX gerado e não pago
-- Mensagem 1 (logo após gerar): como pagar + link do boleto/PIX + prazo de vencimento.
+Boleto:
+- Mensagem 1 (logo após gerar): como pagar + link do boleto + data de vencimento.
 - Mensagem 2 (véspera do vencimento): lembrete curto.
 - Mensagem 3 (vencido): novo link / oferta de gerar de novo.
+
+PIX (o código expira rápido, então não espere):
+- Mensagem 1 (imediato): código/QR do PIX + prazo.
+- Mensagem 2 (30 min depois): lembrete de que o código vai expirar + link para gerar outro.
 
 ## 3. Pós-compra (reduz reembolso)
 - Boas-vindas (imediato): parabéns, onde está o acesso (área de membros), primeiro passo em 5 minutos.

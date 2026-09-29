@@ -295,7 +295,7 @@ def main(argv: "list[str] | None" = None) -> int:
             return 1
         print(f"✅ Endereço salvo: {args.definir_url.strip()}")
         if anterior and anterior != args.definir_url.strip():
-            print(f"⚠️ O endereço mudou: {anterior} → {args.definir_url.strip()}. Atualize na plataforma.")
+            print(f"⚠️ O endereço mudou: {anterior} → {args.definir_url.strip()}. O link antigo deixou de valer: atualize na plataforma.")
         return 0
     try:
         index = montar(pasta, _paleta_efetiva(pasta, args.paleta))

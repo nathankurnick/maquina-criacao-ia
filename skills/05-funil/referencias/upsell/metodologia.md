@@ -56,14 +56,14 @@ Estrutura da página em 4 elementos:
 Presente em todos os 6 exemplos analisados do método:
 
 1. **ALIVIAR ANSIEDADE** — "Você está no lugar certo, não feche a página, parabéns pela ótima decisão." Ansioso → neutro.
-2. **FUTURO BRILHANTE** — pintar em detalhe a vida transformada pelo produto que ACABOU de comprar (o Sérum faz semana a semana). Neutro → animado. Só depois disso pode vender.
+2. **FUTURO BRILHANTE** — pintar em detalhe a vida transformada pelo produto que ACABOU de comprar (o que o produto faz semana a semana). Neutro → animado. Só depois disso pode vender.
 3. **PROBLEMA DIMENSIONALIZADO** — "só tem uma coisa no seu caminho…" O problema é o MOTIVO pelo qual o upsell foi criado (nunca "quero faturar"). Fontes comuns: relatos de clientes, lacuna entre saber e executar.
 4. **SOLUÇÃO DIMENSIONALIZADA** — história de como a solução nasceu + mecanismo nomeado + provas.
 5. **FECHAMENTO** — oferta detalhada, ancoragem de preço (escada descendente), justificativa do desconto, escassez com motivo lógico, garantia dimensionalizada (traduzir prazo em uso real: "180 noites de sono"), CTAs, urgência ("só nesta página").
 
 **Regras extras:**
 - Copy longa vende mais: mirar **1.800–2.500 palavras** (~12–14 min de vídeo; a aula aceita até 20–25 min).
-- Testar preço obsessivamente (o Sérum rodou 8 versões).
+- Testar preço obsessivamente (um upsell real rodou 8 versões de preço).
 - Nomear arquivos de teste: `PRODUTO_Upsell_PRECO`.
 - Garantia deve espelhar ou superar a do front.
 - Se o front deriva de obra/marca de terceiros: NUNCA citar a obra ou o autor na copy ("o material que você acabou de comprar").

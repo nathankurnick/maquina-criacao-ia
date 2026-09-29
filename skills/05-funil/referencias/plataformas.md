@@ -22,3 +22,9 @@ pelo termo entre aspas. Quem configura é o aluno; você explica e confere.
 ## Kiwify / Hotmart / Payt / Eduzz
 Todas têm order bump e upsell pós-compra; os nomes exatos mudam. Termos pra buscar na ajuda:
 "order bump", "upsell de 1 clique", "funil", "página de obrigado", "pixel", "recuperação de carrinho".
+Na Payt, busque na ajuda: "order bump", "upsell", "one click upsell", "página de obrigado", "pixel do Facebook".
+
+- Bump e upsell são produtos SEPARADOS na plataforma (não entram no produto principal).
+- A página OTO (Netlify) NÃO tem pixel da Meta: o evento Purchase vem da plataforma.
+- Se o widget de 1 clique da plataforma tiver um link próprio de recusa, deixe o `recusar_url`
+  apontando para o mesmo destino e não esconda nada.

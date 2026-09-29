@@ -12,4 +12,15 @@ já está com o cartão na mão.
   > **SIM! Quero a Lista de compras inteligente por só R$ 9,90**
   > A lista pronta, separada por setor do mercado, com as quantidades exatas de cada receita.
 - **Sem prova inventada:** não invente depoimento, número de alunos nem resultado na copy do bump.
-- **Conteúdo:** produza no Sistema 03 (`/03-entregaveis`), como um bônus.
+- **Conteúdo (produto SEPARADO):** o bump NÃO entra no produto principal. Escreva o conteúdo com as
+  regras de formato e os scripts do Sistema 03, mas em `<P>/funil/bump/entregaveis/<item>/` (passando
+  `--pasta` para lá). Nunca use `maquina oferta adicionar` para o bump e nunca `--carrossel`. O aluno
+  sobe o PDF na plataforma como um produto separado, ligado ao checkout como order bump.
+
+```bash
+PY="$HOME/.maquina/venv/bin/python"; S3="$HOME/.claude/skills/03-entregaveis/scripts"; "$PY" "$S3/entregavel_pdf.py" --pasta "<P>/funil/bump/entregaveis/<item>" --paleta '<paleta>'
+```
+
+```bash
+PY="$HOME/.maquina/venv/bin/python"; S3="$HOME/.claude/skills/03-entregaveis/scripts"; "$PY" "$S3/entregavel_capa.py" --pasta "<P>/funil/bump/entregaveis/<item>" --paleta '<paleta>' --arte '<descrição visual, sem texto>'
+```
