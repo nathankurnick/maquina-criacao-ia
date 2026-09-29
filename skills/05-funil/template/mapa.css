@@ -1,0 +1,21 @@
+/* template/mapa.css */
+*{box-sizing:border-box;margin:0}
+body{background:var(--pg-fundo-claro);font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--pg-texto-escuro)}
+.mapa{width:1080px;padding:56px 72px 64px}
+.mapa h1{font-size:40px;font-weight:900;margin-bottom:8px}
+.mapa .sub{font-size:20px;opacity:.7;margin-bottom:40px}
+.linha{display:flex;gap:24px;justify-content:center}
+.caixa{flex:1;max-width:620px;background:#fff;border-radius:18px;padding:24px 28px;box-shadow:0 6px 18px rgba(0,0,0,.08);border-top:8px solid var(--pg-fundo-medio)}
+.caixa.oferta{border-top-color:var(--pg-destaque)}
+.caixa .etapa{font-size:15px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--pg-fundo-medio)}
+.caixa .nome{font-size:26px;font-weight:800;margin-top:6px}
+.caixa .preco{font-size:24px;font-weight:900;color:var(--pg-destaque);margin-top:6px}
+.caixa .conv{font-size:17px;margin-top:8px;opacity:.8}
+.seta{text-align:center;font-size:34px;line-height:1;margin:14px 0;color:var(--pg-fundo-medio)}
+.seta small{display:block;font-size:15px;opacity:.7}
+.resumo{margin-top:40px;background:var(--pg-fundo);color:var(--pg-texto-claro);border-radius:18px;padding:28px 32px}
+.resumo .grande{font-size:36px;font-weight:900}
+.resumo .grande span{color:var(--pg-destaque)}
+.resumo p{font-size:19px;margin-top:8px}
+.resumo .nota{font-size:15px;opacity:.7;margin-top:14px}
+.mapa>.caixa{margin:0 auto;width:100%;max-width:620px}
