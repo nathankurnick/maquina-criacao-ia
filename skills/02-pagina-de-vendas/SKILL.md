@@ -124,14 +124,15 @@ PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/02-pagina-de-vendas
   anotar. Se vier "⚠️ O endereço da página mudou", avise que os links dos anúncios precisam ser
   atualizados. Mudanças depois: ajuste e rode este passo de novo — o link continua o mesmo.
 - Saída 3 (sem chave da Netlify): o script mostra o passo a passo do Netlify Drop. Abra a pasta
-  pro aluno achar e acompanhe cada passo (entrar ou criar a conta grátis ANTES de arrastar: sem
+  pro aluno achar (com `--pagina`, abra essa pasta) e acompanhe cada passo (entrar ou criar a conta grátis ANTES de arrastar: sem
   login a página é apagada em cerca de 1 hora):
 
   ```bash
   open "<P>/pagina"
   ```
 
-  Quando o aluno mandar o link, grave-o:
+  Se a página já tem endereço (`url` gravada), o script manda atualizar pela aba Deploys do site
+  na Netlify (arrastar no Drop criaria um endereço novo). Quando o aluno mandar o link, grave-o:
 
   ```bash
   PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/02-pagina-de-vendas/scripts"; "$PY" "$S/pagina_config.py" --projeto "<P>" --definir 'url=https://...'
@@ -139,7 +140,7 @@ PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/02-pagina-de-vendas
 
   Avise: se depois ele passar a publicar com a chave, a página ganha um endereço NOVO e os
   anúncios precisam ser atualizados. Se ele vai continuar editando a página, recomende
-  configurar a chave agora com `maquina chaves`.
+  configurar a chave agora: o aluno roda `maquina chaves` no Terminal dele (é interativo — não rode pelo Bash).
 - Saída 1: mostre a mensagem (falta checkout, falha ao montar, chave recusada…) e resolva. Se
   disser "A Máquina não está instalada direito", peça pra rodar o `instalar.sh` de novo.
 - Saída 130: o aluno cancelou; nada foi publicado.
@@ -149,5 +150,9 @@ PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/02-pagina-de-vendas
 Se o aluno atualizou a Máquina ou pediu "regerar a página", só rode os Passos 5 e 6 (sem
 reescrever a copy): o `conteudo.json` guarda a copy e o template novo é aplicado.
 
-Outras páginas do mesmo projeto (ex.: upsell em `<P>/funil/upsell`) usam os mesmos scripts com
-`--pagina "<pasta>"` depois do `--projeto`.
+## Outra página no mesmo projeto (ex.: upsell do Sistema 05)
+
+Cada página vive na sua pasta, por exemplo `<P>/funil/upsell`, com o próprio `conteudo.json`,
+`imagens/`, `config.json` e `site/`. O link de checkout vem do que o aluno informar para aquela
+oferta (não é o `link_checkout` do oferta.md). Todo comando dos Passos 4 a 6 leva
+`--pagina "<pasta>"` depois do `--projeto`, e a prévia abre `<pasta>/site/index.html`.

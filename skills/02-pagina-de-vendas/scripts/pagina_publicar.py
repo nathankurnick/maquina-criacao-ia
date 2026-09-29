@@ -26,7 +26,7 @@ except Exception:  # ImportError ou núcleo quebrado
     MaquinaErro = RuntimeError
 
 from pagina_conteudo import ler_config, normalizar, salvar_config  # noqa: E402
-from pagina_render import montar_site  # noqa: E402
+from pagina_render import _relativa, montar_site  # noqa: E402
 
 
 class SemToken(Exception):
@@ -96,13 +96,22 @@ def main(argv: "list[str] | None" = None) -> int:
     try:
         r = publicar(Path(args.projeto), pagina)
     except SemToken:
-        print("ℹ️ A chave da Netlify não está configurada, então publique na mão (2 minutos):\n"
-              "   1. Entre (ou crie) sua conta grátis na Netlify ANTES de arrastar — sem login a página "
-              "é apagada em cerca de 1 hora.\n"
-              "   2. Abra https://app.netlify.com/drop\n"
-              f"   3. Arraste a pasta {site} pra dentro da página.\n"
-              "   4. Copie o link que aparecer e me mande — é o endereço da sua página.\n"
-              "   Pra publicar sozinho das próximas vezes: rode `maquina chaves` e cole a chave da Netlify.")
+        url = ler_config(pagina).get("url") or ""
+        pasta = _relativa(args.projeto, pagina)
+        if url:
+            print(f"ℹ️ Sua página já está no ar em {url}. Pra atualizar SEM mudar o endereço: entre na "
+                  f"Netlify, abra esse site, vá na aba Deploys e arraste a pasta {site} lá. "
+                  "(Arrastar em app.netlify.com/drop cria um endereço NOVO.)\n"
+                  f"   A pasta fica em {pasta}/site.")
+        else:
+            print("ℹ️ A chave da Netlify não está configurada, então publique na mão (2 minutos):\n"
+                  "   1. Entre (ou crie) sua conta grátis na Netlify ANTES de arrastar — sem login a página "
+                  "é apagada em cerca de 1 hora.\n"
+                  "   2. Abra https://app.netlify.com/drop\n"
+                  f"   3. Arraste a pasta {site} pra dentro da página.\n"
+                  "   4. Copie o link que aparecer e me mande — é o endereço da sua página.")
+        print("   Pra publicar sozinho das próximas vezes: rode `maquina chaves` no Terminal (é interativo) "
+              "e cole a chave da Netlify.")
         return 3
     except ValueError as e:
         print(f"❌ {e}", file=sys.stderr)

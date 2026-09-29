@@ -280,13 +280,20 @@ def montar_site(pasta_projeto: Path, pasta_pagina: "Path | None" = None) -> "tup
         shutil.rmtree(novo)
     (novo / "img").mkdir(parents=True)
     try:
-        return _montar(pagina, conteudo, config, avisos, site, novo)
+        return _montar(pagina, conteudo, config, avisos, site, novo, _relativa(pasta_projeto, pagina))
     except BaseException:
         shutil.rmtree(novo, ignore_errors=True)
         raise
 
 
-def _montar(pagina, conteudo, config, avisos, site, novo):
+def _relativa(pasta_projeto, pagina) -> str:
+    try:
+        return Path(pagina).resolve().relative_to(Path(pasta_projeto).resolve()).as_posix()
+    except ValueError:
+        return Path(pagina).as_posix()
+
+
+def _montar(pagina, conteudo, config, avisos, site, novo, rel="pagina"):
 
     imagens = {"logo": "", "carrossel": [], "depoimentos": []}
     logos = [p for p in sorted((pagina / "imagens").iterdir())
@@ -302,10 +309,10 @@ def _montar(pagina, conteudo, config, avisos, site, novo):
             shutil.copyfile(foto, destino)
             imagens[tipo].append(f"img/{destino.name}")
     if not imagens["depoimentos"]:
-        avisos.append("depoimentos: sem prints em pagina/imagens/depoimentos/ — a seção fica escondida "
+        avisos.append(f"depoimentos: sem prints em {rel}/imagens/depoimentos/ — a seção fica escondida "
                       "(coloque só depoimentos reais).")
     if conteudo["carrossel"]["ativo"] and not imagens["carrossel"]:
-        avisos.append("carrossel: sem imagens em pagina/imagens/carrossel/ — a seção fica escondida.")
+        avisos.append(f"carrossel: sem imagens em {rel}/imagens/carrossel/ — a seção fica escondida.")
 
     index = novo / "index.html"
     index.write_text(render_html(conteudo, config, imagens, date.today().year), encoding="utf-8")

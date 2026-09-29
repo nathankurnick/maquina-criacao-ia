@@ -72,6 +72,7 @@ def _executar(args) -> int:
         return 1
 
     if novos:
+        antiga = config.get("url") or ""
         config.update(novos)
         try:
             salvar_config(pasta, config)
@@ -79,6 +80,9 @@ def _executar(args) -> int:
             print(f"❌ Não consegui salvar o config.json em {pasta} ({type(e).__name__}).", file=sys.stderr)
             return 1
         print("✅ Configuração salva.")
+        nova = config.get("url") or ""
+        if "url" in novos and antiga and nova != antiga:
+            print(f"⚠️ O endereço da página mudou: {antiga} → {nova}. Atualize o link nos seus anúncios.")
     _mostrar(config)
     return 0
 

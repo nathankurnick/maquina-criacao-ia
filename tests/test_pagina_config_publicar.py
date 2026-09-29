@@ -318,3 +318,37 @@ def test_render_config_publicar_com_pasta_pagina_propria(ambiente, tmp_path, mon
     assert pagina_publicar.main(["--projeto", str(p), "--pagina", str(up)]) == 0
     assert vistos == [up / "site"]
     assert pc.ler_config(up)["site_id"] == "u1" and pc.ler_config(p / "pagina")["site_id"] == ""
+
+
+def test_exit3_com_url_ja_gravada_manda_atualizar_pelo_deploys(ambiente, tmp_path, capsys):
+    p = _proj(tmp_path)
+    pc.salvar_config(p / "pagina", dict(pc.CONFIG_PADRAO, url="https://minha.netlify.app"))
+    assert pagina_publicar.main(["--projeto", str(p)]) == 3
+    out = capsys.readouterr().out
+    assert "Sua página já está no ar em https://minha.netlify.app" in out
+    assert "aba Deploys" in out and "cria um endereço NOVO" in out
+    assert "1. Entre" not in out
+    assert "no Terminal" in out and "interativo" in out
+
+
+def test_config_url_diferente_avisa_mudanca(tmp_path, capsys):
+    p = _proj(tmp_path)
+    pc.salvar_config(p / "pagina", dict(pc.CONFIG_PADRAO, url="https://velho.netlify.app"))
+    assert pagina_config.main(["--projeto", str(p), "--definir", "url=https://novo.netlify.app"]) == 0
+    assert "⚠️ O endereço da página mudou: https://velho.netlify.app → https://novo.netlify.app" in capsys.readouterr().out
+    capsys.readouterr()
+    pagina_config.main(["--projeto", str(p), "--definir", "url=https://novo.netlify.app"])
+    assert "mudou" not in capsys.readouterr().out
+
+
+def test_avisos_do_render_usam_a_pasta_real_da_pagina(ambiente, tmp_path, capsys):
+    p = _proj(tmp_path)
+    up = p / "funil" / "upsell"
+    up.mkdir(parents=True)
+    (up / "conteudo.json").write_text(json.dumps(
+        {"hero": {"headline": "U"}, "planos": {"basico": {"checkoutUrl": "https://c.com/u", "precoPor": "R$ 9"}}}))
+    assert pagina_render.main(["--projeto", str(p), "--pagina", str(up)]) == 0
+    out = capsys.readouterr().out
+    assert "funil/upsell/imagens/depoimentos/" in out and "pagina/imagens" not in out
+    assert pagina_publicar.main(["--projeto", str(p), "--pagina", str(up)]) == 3
+    assert "funil/upsell" not in capsys.readouterr().err
