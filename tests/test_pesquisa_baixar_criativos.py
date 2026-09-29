@@ -125,3 +125,33 @@ def test_oferta_zero_ou_negativa_sai_1(tmp_path):
     _monta(tmp_path)
     assert bc.main(_args(tmp_path, "0")) == 1
     assert bc.main(_args(tmp_path, "-1")) == 1
+
+
+def test_so_aceita_http_e_https(tmp_path, monkeypatch):
+    anuncios = [_ad(1, videos=["file:///etc/passwd"], imagens=["ftp://x/a.jpg"]),
+                _ad(2, videos=[], imagens=["HTTPS://x/a.jpg"])]
+    (tmp_path / "anuncios.json").write_text(json.dumps(anuncios))
+    (tmp_path / "ofertas.json").write_text(json.dumps({"ofertas": [{"chave": "x", "ids": ["1", "2"]}]}))
+    chamadas = []
+    monkeypatch.setattr(bc, "baixar", lambda u, d: chamadas.append(u) or d.write_bytes(b"x") or True)
+    assert bc.main(_args(tmp_path)) == 0
+    assert chamadas == ["HTTPS://x/a.jpg"]
+
+
+def test_baixar_tem_limite_de_tempo_total(tmp_path, monkeypatch):
+    class Resp:
+        headers = {}
+
+        def read(self, n=-1):
+            return b"x"
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+    monkeypatch.setattr(bc.urllib.request, "urlopen", lambda req, timeout: Resp())
+    tempos = iter([0, 0, 1000, 2000, 3000])
+    monkeypatch.setattr(bc.time, "monotonic", lambda: next(tempos))
+    destino = tmp_path / "a.mp4"
+    assert bc.baixar("https://x/a.mp4", destino) is False and not destino.exists()

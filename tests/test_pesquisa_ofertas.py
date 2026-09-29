@@ -305,3 +305,15 @@ def test_erro_ao_gravar_saida_e_amigavel_e_vai_pro_log(tmp_path, capsys, monkeyp
     err = capsys.readouterr().err
     assert "Não consegui gravar" in err and "Traceback" not in err
     assert "Traceback" in (home / "log" / "maquina.log").read_text()
+
+
+@pytest.mark.parametrize("link", [
+    "https://chat.whatsapp.com/Ab12345CD6789EfGh",
+    "https://whatsapp.com/channel/0029Va12345678",
+    "https://api.whatsapp.com/send?phone=abc12345678xyz",
+    "https://wa.me/message/AB12345678",
+])
+def test_whatsapp_convite_nao_vira_telefone(link):
+    assert of.chave_oferta(link) == "whatsapp:"
+    a = {"id": "1", "pagina": "Página X", "link": link, "texto": "texto suficiente aqui"}
+    assert of.analisar([a], HOJE)["ofertas"][0]["chave"] == "whatsapp:Página X"

@@ -9,6 +9,7 @@ import argparse
 import json
 import os
 import sys
+import time
 import traceback
 import urllib.request
 from datetime import datetime
@@ -19,6 +20,7 @@ USER_AGENT = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.3
               "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
 REFERER = "https://www.facebook.com/"
 TIMEOUT = 60
+TEMPO_MAX = 180  # limite total por arquivo (o timeout do socket sozinho não cobre download lento)
 LIMITE_BYTES = 60 * 1024 * 1024
 MAX_ANUNCIOS = 10
 BIBLIOTECA = "https://www.facebook.com/ads/library/?id="
@@ -46,8 +48,11 @@ def baixar(url: str, destino: Path) -> bool:
             if tamanho and tamanho.isdigit() and int(tamanho) > LIMITE_BYTES:
                 return False
             total = 0
+            inicio = time.monotonic()
             with open(parcial, "wb") as f:
                 while True:
+                    if time.monotonic() - inicio > TEMPO_MAX:
+                        return False
                     pedaco = resp.read(1024 * 256)
                     if not pedaco:
                         break
@@ -144,7 +149,7 @@ def main(argv: "list[str] | None" = None) -> int:
         for tipo, campo, padrao in (("imagem", "imagens", ".jpg"), ("video", "videos", ".mp4")):
             urls = a.get(campo)
             url = urls[0] if isinstance(urls, list) and urls and isinstance(urls[0], str) else ""
-            if not url:
+            if urlparse(url).scheme.lower() not in ("http", "https"):
                 continue
             nome = f"{seguro(aid)}-{tipo}{_extensao(url, padrao)}"
             try:

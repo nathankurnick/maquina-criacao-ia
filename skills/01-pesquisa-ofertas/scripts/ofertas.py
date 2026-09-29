@@ -17,7 +17,6 @@ from urllib.parse import parse_qs, unquote, urlparse
 PLATAFORMAS = (
     "hotmart.com", "kiwify.com.br", "kiwify.com", "payt.com.br", "eduzz.com",
     "monetizze.com.br", "perfectpay.com.br", "braip.com", "ticto.com.br",
-    "linktr.ee", "wa.me", "whatsapp.com",
 )
 ENCURTADORES = (
     "bit.ly", "tinyurl.com", "is.gd", "cutt.ly", "encurtador.com.br", "abre.ai",
@@ -48,7 +47,10 @@ def _log_tecnico(e: BaseException) -> None:
 
 
 def _telefone(texto: str) -> str:
-    digitos = re.sub(r"\D", "", unquote(texto or ""))
+    bruto = unquote(texto or "").strip()
+    if not re.fullmatch(r"\+?[\d\s().-]+", bruto):  # convite/canal não é telefone
+        return ""
+    digitos = re.sub(r"\D", "", bruto)
     return digitos if len(digitos) >= 8 else ""
 
 

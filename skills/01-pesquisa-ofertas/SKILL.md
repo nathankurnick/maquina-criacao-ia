@@ -74,6 +74,8 @@ PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/01-pesquisa-ofertas
   numerada a partir de 1: mostre-as separadas e pergunte "link X, oferta N".
 - Link de página de vendas: pule direto pro Passo 5 com cada link; a pasta da oferta é
   `<P>/pesquisa/oferta-<domínio-em-slug>` (ex.: `site.com.br` → `oferta-site-com-br`).
+  Nessa rota **não existe `ofertas.json`**: pule `registrar_escolha.py` e `baixar_criativos.py`
+  (eles dependem dele) e faça só a captura, a dissecação e a modelagem.
 
 ## Passo 4 — Ranquear e mostrar o top 10
 
@@ -89,8 +91,11 @@ Mostre a tabela impressa (ela também fica em `<B>/ofertas.md`) e explique o ter
 linha: **🔥 escalada** = muitos anúncios (coluna Volume) rodando há 30+ dias; **📈 validando**;
 **🌱 em teste**. Os números vêm do script — **nunca invente ou arredonde números**.
 A oferta aparece pela chave do destino do anúncio (ex.: `hotmart.com/<código>`, `bit.ly/<x>`,
-`wa.me/<número>`, `whatsapp:<página>` quando o link de WhatsApp não tem telefone); links
-encurtados e de WhatsApp não mostram a página de vendas de verdade.
+`whatsapp/<número>`, `whatsapp:<página>` quando o link de WhatsApp não tem telefone). Quando o
+destino é um site compartilhado (YouTube, Telegram, Messenger, Google Docs/Forms/Sites,
+`hotmart.com` sem produto), os anúncios são agrupados por anunciante e a chave aparece como
+`youtube:<página>`, `telegram:<página>`, `messenger:<página>`, `google:<página>` ou
+`hotmart:<página>`; links encurtados e de WhatsApp não mostram a página de vendas de verdade.
 A última linha do script resume o que foi ignorado (iscas, anúncios sem link, inválidos): se
 houve iscas descartadas, diga que eram anúncios-disfarce e foram ignorados.
 

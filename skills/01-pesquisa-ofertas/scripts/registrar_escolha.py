@@ -5,9 +5,23 @@ A pasta da busca fica em <projeto>/pesquisa/<busca>; o arquivo vai na pasta pai 
 """
 import argparse
 import json
+import os
 import sys
-from datetime import date
+import traceback
+from datetime import date, datetime
 from pathlib import Path
+
+
+def _log_tecnico(e: BaseException) -> None:
+    """Grava o traceback completo em ~/.maquina/log/maquina.log. Nunca levanta erro."""
+    try:
+        base = Path(os.environ.get("MAQUINA_HOME") or Path.home() / ".maquina") / "log"
+        base.mkdir(parents=True, exist_ok=True)
+        with (base / "maquina.log").open("a", encoding="utf-8") as f:
+            f.write(f"[{datetime.now().isoformat(timespec='seconds')}] registrar_escolha.py\n")
+            f.write("".join(traceback.format_exception(type(e), e, e.__traceback__)) + "\n")
+    except Exception:
+        pass
 
 
 class _Parser(argparse.ArgumentParser):
@@ -33,7 +47,8 @@ def main(argv: "list[str] | None" = None) -> int:
         if n < 1:
             raise IndexError
         chave = ofertas[n - 1]["chave"]
-    except (OSError, ValueError, KeyError, IndexError, TypeError):
+    except (OSError, ValueError, KeyError, IndexError, TypeError) as e:
+        _log_tecnico(e)
         print(f"❌ Não achei a oferta '{args.oferta}' em {busca / 'ofertas.json'}. Confira o número da tabela "
               "e a pasta da busca.", file=sys.stderr)
         return 1
@@ -42,7 +57,8 @@ def main(argv: "list[str] | None" = None) -> int:
     alvo = busca.parent / "escolhida.json"
     try:
         alvo.write_text(json.dumps(escolhida, ensure_ascii=False, indent=2), encoding="utf-8")
-    except OSError:
+    except OSError as e:
+        _log_tecnico(e)
         print(f"❌ Não consegui gravar {alvo}. Verifique a pasta e o espaço em disco.", file=sys.stderr)
         return 1
     print(f"✅ Escolha registrada → {alvo}")

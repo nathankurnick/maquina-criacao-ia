@@ -32,3 +32,13 @@ def test_erros_amigaveis(tmp_path, capsys):
     assert re_.main(["--busca", str(tmp_path / "nada"), "--oferta", "1", "--pasta-oferta", "x"]) == 1
     assert re_.main([]) == 1
     assert "Traceback" not in capsys.readouterr().err
+
+
+def test_erro_ao_gravar_vai_pro_log(tmp_path, monkeypatch, capsys):
+    home = tmp_path / "home"
+    monkeypatch.setenv("MAQUINA_HOME", str(home))
+    b = _busca(tmp_path)
+    (b.parent / "escolhida.json").mkdir()  # gravar em cima de uma pasta dá OSError
+    assert re_.main(["--busca", str(b), "--oferta", "1", "--pasta-oferta", "x"]) == 1
+    assert "Traceback" not in capsys.readouterr().err
+    assert "Traceback" in (home / "log" / "maquina.log").read_text()
