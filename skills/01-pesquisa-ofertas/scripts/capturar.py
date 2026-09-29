@@ -20,6 +20,7 @@ USER_AGENT_MOVEL = ("Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) Appl
                     "(KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1")
 FATIA_ALTURA = 2400
 MAX_FATIAS = 20
+LARGURA_MAX = 1280
 SAIDAS_ANTIGAS = ("dobra.png", "pagina.png", "pagina.txt", "dados.json")
 OFERTA_MANUAL = "Se preferir, mande prints e o texto da página que eu sigo com eles."
 
@@ -56,7 +57,7 @@ def extrair_dados(texto: str, links: list[str]) -> dict:
 def _limpar(saida: Path) -> None:
     for nome in SAIDAS_ANTIGAS:
         (saida / nome).unlink(missing_ok=True)
-    for f in saida.glob("pagina-*.png"):
+    for f in saida.glob("pagina-[0-9][0-9].png"):
         f.unlink(missing_ok=True)
 
 
@@ -83,18 +84,22 @@ def capturar(url: str, saida: Path) -> dict:
                 pos = pagina.evaluate("() => { window.scrollBy(0, 900); return "
                                       "[window.scrollY + window.innerHeight, document.documentElement.scrollHeight]; }")
                 pagina.wait_for_timeout(150)
-                if pos[0] >= pos[1] - 2:
+                if pos[0] >= min(pos[1], MAX_FATIAS * FATIA_ALTURA) - 2:
                     break
             pagina.evaluate("() => window.scrollTo(0, 0)")
             pagina.wait_for_timeout(800)
             altura = int(pagina.evaluate("() => document.documentElement.scrollHeight"))
+            largura = min(LARGURA_MAX, int(pagina.evaluate(
+                "() => Math.max(document.documentElement.scrollWidth, "
+                "document.body ? document.body.scrollWidth : 0, window.innerWidth)")))
+            capturada = min(altura, MAX_FATIAS * FATIA_ALTURA)
             pagina.screenshot(path=str(saida / "dobra.png"))
             prints = []
             for i in range(min(MAX_FATIAS, max(1, -(-altura // FATIA_ALTURA)))):
                 y = i * FATIA_ALTURA
                 nome = f"pagina-{i + 1:02d}.png"
                 pagina.screenshot(path=str(saida / nome), full_page=True, scale="css",
-                                  clip={"x": 0, "y": y, "width": 390, "height": min(FATIA_ALTURA, altura - y)})
+                                  clip={"x": 0, "y": y, "width": largura, "height": min(FATIA_ALTURA, altura - y)})
                 prints.append(nome)
             texto = pagina.inner_text("body")[:40000]
             links = pagina.eval_on_selector_all("a[href]", "els => els.map(e => e.href)")
@@ -106,7 +111,8 @@ def capturar(url: str, saida: Path) -> dict:
             except Exception:  # não pode mascarar o erro original
                 pass
     (saida / "pagina.txt").write_text(texto, encoding="utf-8")
-    dados = {"url": url, "url_final": url_final, "titulo": titulo, "altura": altura, "prints": prints,
+    dados = {"url": url, "url_final": url_final, "titulo": titulo, "altura": altura, "altura_capturada": capturada,
+             "truncada": altura > MAX_FATIAS * FATIA_ALTURA, "largura": largura, "prints": prints,
              **extrair_dados(texto, links)}
     (saida / "dados.json").write_text(json.dumps(dados, ensure_ascii=False, indent=2), encoding="utf-8")
     return dados
@@ -169,6 +175,8 @@ def main(argv: "list[str] | None" = None) -> int:
         print(_mensagem_erro(e), file=sys.stderr)
         return 1
     print(f"✅ Página capturada: {dados['titulo'] or args.url}")
+    if dados.get("truncada"):
+        print(f"⚠️ Página muito longa: capturei só os primeiros {dados['altura_capturada']} px.")
     print(f"   Preços vistos: {', '.join(dados['precos']) or 'nenhum'}")
     print(f"   Checkout: {', '.join(dados['links_checkout']) or 'não achei'}")
     return 0

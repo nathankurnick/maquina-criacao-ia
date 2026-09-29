@@ -160,9 +160,16 @@ class _Pagina:
     def wait_for_timeout(self, ms): pass
 
     def evaluate(self, js):
+        alt = self.log.get("altura", 5000)
         if "scrollBy" in js:
-            return [100000, 100000]
-        return 5000
+            self.log["scrolls"] = self.log.get("scrolls", 0) + 1
+            y = self.log["scrolls"] * 900
+            return [y + 800, alt]
+        if "scrollWidth" in js:
+            return self.log.get("largura", 390)
+        if "scrollTo" in js:
+            return None
+        return alt
 
     def screenshot(self, path, **kw):
         self.log["shots"].append((path, kw))
@@ -216,6 +223,55 @@ def test_capturar_navegacao_e_emulacao_movel(tmp_path, monkeypatch):
     clips = [kw["clip"] for path, kw in log["shots"] if "clip" in kw]
     assert all(c["height"] <= 2400 and c["width"] == 390 for c in clips)
     assert sum(c["height"] for c in clips) == 5000
+    assert dados["largura"] == 390 and dados["truncada"] is False and dados["altura_capturada"] == 5000
+
+
+def test_capturar_largura_real_com_cap(tmp_path, monkeypatch):
+    log = {"goto": [], "shots": [], "largura": 5000}
+    _fake_playwright(monkeypatch, log)
+    dados = capturar.capturar("https://x.com", tmp_path / "o")
+    assert dados["largura"] == 1280
+    assert all(kw["clip"]["width"] == 1280 for path, kw in log["shots"] if "clip" in kw)
+
+
+def test_capturar_pagina_longa_truncada(tmp_path, monkeypatch):
+    log = {"goto": [], "shots": [], "altura": 60000}
+    _fake_playwright(monkeypatch, log)
+    dados = capturar.capturar("https://x.com", tmp_path / "o")
+    assert dados["truncada"] is True and dados["altura"] == 60000
+    assert dados["altura_capturada"] == 48000 and len(dados["prints"]) == 20
+    assert 50 <= log["scrolls"] <= 54  # rolou até a altura capturada, não até 60000
+
+
+def test_main_avisa_pagina_truncada(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(capturar, "capturar", lambda u, s: {
+        "url": u, "titulo": "T", "precos": [], "links_checkout": [], "garantia": "",
+        "truncada": True, "altura_capturada": 48000})
+    assert capturar.main(["--url", "https://x.com", "--saida", str(tmp_path)]) == 0
+    assert "Página muito longa: capturei só os primeiros 48000 px." in capsys.readouterr().out
+
+
+def test_limpar_preserva_pagina_foo(tmp_path):
+    for n in ("pagina-01.png", "pagina-foo.png", "pagina-1.png"):
+        (tmp_path / n).write_text("x")
+    capturar._limpar(tmp_path)
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["pagina-1.png", "pagina-foo.png"]
+
+
+def test_capturar_sem_meta_viewport_usa_largura_real(tmp_path):
+    pytest.importorskip("playwright")
+    html = tmp_path / "lp.html"
+    html.write_text('<html><body style="margin:0"><div style="width:980px;height:3000px;background:#ccc">x</div>'
+                    "</body></html>", encoding="utf-8")
+    try:
+        dados = capturar.capturar(html.as_uri(), tmp_path / "out")
+    except Exception as e:
+        if isinstance(e, ImportError) or "Executable doesn't exist" in str(e):
+            pytest.skip(f"Chromium do Playwright indisponível: {e}")
+        raise
+    assert dados["largura"] == 980
+    largura_png = int.from_bytes((tmp_path / "out" / dados["prints"][0]).read_bytes()[16:20], "big")
+    assert largura_png == 980
 
 
 def test_capturar_nao_repete_em_erro_de_dns(tmp_path, monkeypatch):
