@@ -171,8 +171,8 @@ def gerar(pasta: Path, paleta_nome: str, carrossel: "Path | None" = None, ordem:
         raise ValueError(f"O {md_arq} não está em UTF-8. Abra e salve o arquivo como UTF-8.") from err
     avisos: list[str] = []
     if capa and _capa_antiga(pasta):
-        avisos.append("⚠️ A capa (capa.png) é mais antiga que o meta.json — se mudou título, subtítulo, autor ou "
-                      "paleta, rode a capa de novo (sem --arte) antes do PDF.")
+        avisos.append("⚠️ A capa (capa.png) é mais antiga que o meta.json — se mudou título, subtítulo ou autor, "
+                      "rode a capa de novo (sem --arte) antes do PDF.")
     if carrossel is not None and meta["tipo"] == "roteiro":
         carrossel = None
         avisos.append("ℹ️ Roteiro é material interno do curso: não copiei imagens pro carrossel da página.")
@@ -254,31 +254,23 @@ def gerar(pasta: Path, paleta_nome: str, carrossel: "Path | None" = None, ordem:
         render.unlink(missing_ok=True)
 
     copiados: list[Path] = []
-    if carrossel is not None:
-        carrossel = Path(carrossel)
-        carrossel.mkdir(parents=True, exist_ok=True)
-        padrao = re.compile(rf"\d{{2}}-{re.escape(pasta.name)}-\d{{2}}\.(png|jpg)")
-        for velho in carrossel.iterdir():
-            if padrao.fullmatch(velho.name):
-                velho.unlink()
-        prefixo = f"{ordem:02d}-{pasta.name}"
-        origens = ([capa_jpg] if capa else []) + amostras
-        for n, origem in enumerate(origens, 1):
-            destino = carrossel / f"{prefixo}-{n:02d}{origem.suffix if origem != capa_jpg else '.jpg'}"
-            shutil.copyfile(origem, destino)
-            copiados.append(destino)
+    try:
+        if carrossel is not None:
+            carrossel = Path(carrossel)
+            carrossel.mkdir(parents=True, exist_ok=True)
+            padrao = re.compile(rf"(\d{{2}}-)?{re.escape(pasta.name)}-\d{{2}}\.(png|jpg)")
+            for velho in carrossel.iterdir():
+                if padrao.fullmatch(velho.name):
+                    velho.unlink()
+            prefixo = f"{ordem:02d}-{pasta.name}"
+            origens = ([capa_jpg] if capa else []) + amostras
+            for n, origem in enumerate(origens, 1):
+                destino = carrossel / f"{prefixo}-{n:02d}{origem.suffix if origem != capa_jpg else '.jpg'}"
+                shutil.copyfile(origem, destino)
+                copiados.append(destino)
+    finally:
         capa_jpg.unlink(missing_ok=True)
     return {"pdf": pdf, "amostras": amostras, "carrossel": copiados, "clips": clips, "avisos": avisos}
-
-
-def _ordem(txt: str) -> int:
-    try:
-        n = int(txt)
-    except ValueError:
-        raise argparse.ArgumentTypeError("precisa ser um número de 1 a 99") from None
-    if not 1 <= n <= 99:
-        raise argparse.ArgumentTypeError("precisa ser um número de 1 a 99")
-    return n
 
 
 def main(argv: "list[str] | None" = None) -> int:
@@ -286,11 +278,16 @@ def main(argv: "list[str] | None" = None) -> int:
     ap.add_argument("--pasta", required=True)
     ap.add_argument("--paleta", default="")
     ap.add_argument("--carrossel", default="")
-    ap.add_argument("--ordem", type=_ordem, default=50)
+    ap.add_argument("--ordem", default="50")
     try:
         args = ap.parse_args(argv)
     except SystemExit as s:
         return int(s.code or 0)
+    if not re.fullmatch(r"\d{1,2}", args.ordem.strip()) or not 1 <= int(args.ordem) <= 99:
+        print("❌ O --ordem precisa ser um número de 1 a 99 (ex.: --ordem 1 para o produto principal).",
+              file=sys.stderr)
+        return 1
+    args.ordem = int(args.ordem)
     if not NUCLEO_OK:
         print("❌ A Máquina não está instalada direito (não achei o núcleo). Rode o instalar.sh de novo.",
               file=sys.stderr)

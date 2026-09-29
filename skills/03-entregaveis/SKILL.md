@@ -62,8 +62,8 @@ com hífens, sem espaços) com:
 - Planilha: em vez de `conteudo.md`, um `planilha.json` com
   `{"abas": [{"nome": "...", "colunas": [...], "linhas": [[...]], "larguras": [...]}]}`
   (`larguras` é opcional; texto começando com `=` vira fórmula). Fórmulas sempre em **inglês e
-  com vírgula**: `=SUM(C2:C31)`, `=IF(A2>0,1,0)` (nunca `SOMA`, `SE` nem `;`: o script recusa e
-  explica). Números vão como números do JSON (`420`, não `"420"`). Opcional por aba:
+  com vírgula**: `=SUM(C2:C31)`, `=IF(A2>0,1,0)` (as mais comuns em português, como `SOMA` e `SE`, e o `;` são
+  recusadas; escreva sempre em inglês). Números vão como números do JSON (`420`, não `"420"`). Opcional por aba:
   `"formatos": ["texto", "numero", "moeda", "percentual", "data"]`, um por coluna na ordem de
   `colunas` (moeda sai como R$; data aceita `"2026-10-01"`).
 - Imagens dentro do conteúdo: arquivos em `imagens/` com nome em minúsculas, sem acento, com
@@ -77,7 +77,7 @@ você gerar. Nunca invente prova nem estudo. Faltou prova (depoimento, número d
 cliente): escreva "[cole aqui um depoimento real]" (ou o item que faltar) e pergunte ao aluno.
 Faltou estudo, estatística ou citação: marque "(confirme esta informação)" e pergunte.
 
-## Passo 4 — Capa e mockup (ebook, guia, checklist, roteiro)
+## Passo 4 — Capa e mockup (ebook, guia, checklist)
 
 Faça a capa **antes** do PDF: se `capa.png` existir, o PDF a usa como primeira página.
 
@@ -117,7 +117,7 @@ PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/03-entregaveis/scri
   reduzida, se existir), `NN-<slug>-02.png`…, onde `NN` é o `--ordem` (1 a 99, padrão 50): o
   carrossel segue essa ordem. Use `--ordem 1` no produto principal, `--ordem 2` no primeiro
   bônus, `--ordem 3` no seguinte, e assim por diante. Só os arquivos deste entregável são
-  substituídos; os outros do carrossel ficam. Omita `--carrossel` se o aluno não quiser.
+  substituídos; os outros do carrossel ficam. Omita `--carrossel` se o aluno não quiser. Slides: não use `--carrossel`.
   Roteiro não vai pro carrossel (o script pula a cópia e avisa).
 - Se falhar, o PDF anterior é mantido. Erros comuns: `meta.json`/`conteudo.md` faltando, erro de
   formatação, arquivo que não está em UTF-8 (peça pra salvar como UTF-8).

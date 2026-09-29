@@ -25,9 +25,12 @@ _CTRL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")  # caracteres proibidos em X
 # formato -> (numFmtId, código customizado ou None)
 _FORMATOS = {"texto": (49, None), "numero": (4, None), "moeda": (164, '"R$" #,##0.00'),
              "percentual": (9, None), "data": (165, "dd/mm/yyyy")}
-_PT_PARA_EN = {"SOMASE": "SUMIF", "SOMA": "SUM", "SE": "IF", "PROCV": "VLOOKUP", "MÉDIA": "AVERAGE",
-               "MEDIA": "AVERAGE", "CONT.SE": "COUNTIF"}
-_PT_FUNC = re.compile(r"(?<![A-Za-z0-9_.])(SOMASE|SOMA|SE|PROCV|MÉDIA|MEDIA|CONT\.SE)\s*\(", re.I)
+_PT_PARA_EN = {"SOMASE": "SUMIF", "SOMA": "SUM", "SE": "IF", "SEERRO": "IFERROR", "PROCV": "VLOOKUP",
+               "PROCH": "HLOOKUP", "MEDIA": "AVERAGE", "CONT.SE": "COUNTIF", "CONT.VALORES": "COUNTA",
+               "HOJE": "TODAY", "AGORA": "NOW", "ARRED": "ROUND", "E": "AND", "OU": "OR", "MAXIMO": "MAX",
+               "MINIMO": "MIN", "INDICE": "INDEX", "CORRESP": "MATCH"}
+_PT_FUNC = re.compile(r"(?<![A-Za-z0-9_.])(SOMASE|SOMA|SEERRO|SE|PROCV|PROCH|M[ÉE]DIA|CONT\.SE|CONT\.VALORES|HOJE|"
+                      r"AGORA|ARRED|E|OU|M[ÁA]XIMO|M[ÍI]NIMO|[ÍI]NDICE|CORRESP)\s*\(", re.I)
 _EXCEL_ZERO = datetime.date(1899, 12, 30)
 
 
@@ -179,10 +182,10 @@ def _validar_formula(texto: str, ref: str, nome: str) -> None:
     sem_aspas = re.sub(r'"[^"]*"', '""', texto)
     achou = _PT_FUNC.search(sem_aspas)
     if achou:
-        pt = achou.group(1).upper()
-        en = _PT_PARA_EN[pt.replace("É", "E") if pt not in _PT_PARA_EN else pt]
+        pt = achou.group(1).upper().translate(str.maketrans("ÉÁÍ", "EAI"))
+        en = _PT_PARA_EN[pt]
         raise ValueError(f'A fórmula da célula {ref} (aba "{nome}") usa o nome em português {achou.group(1)}(…). '
-                         f"Use o nome em inglês, que funciona em qualquer Excel: {en}(…).")
+                         f"Escreva sempre em inglês, que funciona em qualquer Excel: {en}(…).")
     if ";" in sem_aspas:
         raise ValueError(f'A fórmula da célula {ref} (aba "{nome}") usa ponto e vírgula. Use vírgula entre os '
                          "argumentos, por exemplo =IF(A2>0,1,0).")
@@ -195,7 +198,8 @@ def _validar_aba(aba: dict, arq) -> None:
         raise ValueError(f"As \"linhas\" de cada aba do {arq} precisam ser uma lista.")
     larguras = aba.get("larguras")
     if larguras is not None and (not isinstance(larguras, list) or not all(
-            isinstance(w, (int, float)) and not isinstance(w, bool) and w > 0 for w in larguras)):
+            isinstance(w, (int, float)) and not isinstance(w, bool) and math.isfinite(w) and w > 0
+            for w in larguras)):
         raise ValueError(f'As "larguras" da aba "{nome}" precisam ser uma lista de números, como [12, 30, 15].')
     formatos = aba.get("formatos")
     if formatos is not None:
@@ -211,9 +215,11 @@ def _validar_aba(aba: dict, arq) -> None:
                              'como ["Seg", "Omelete", 420].')
         for c, v in enumerate(linha, 1):
             ref = f"{_coluna(c)}{r}"
-            if isinstance(v, str) and v.startswith("=") and len(v) > 1:
+            eh_formula = isinstance(v, str) and v.startswith("=") and len(v) > 1
+            if eh_formula:
                 _validar_formula(v, ref, nome)
-            if c <= len(formatos) and formatos[c - 1] == "data" and isinstance(v, str) and v.strip():
+            if (c <= len(formatos) and formatos[c - 1] == "data" and isinstance(v, str) and v.strip()
+                    and not eh_formula):
                 try:
                     if _serial_data(v) is None:
                         raise ValueError

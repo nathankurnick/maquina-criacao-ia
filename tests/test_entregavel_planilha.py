@@ -178,3 +178,36 @@ def test_nome_de_aba_sem_caracteres_de_controle(tmp_path):
     arq = ep.gerar_xlsx([{"nome": "A\u0001b", "colunas": ["x"], "linhas": []}], tmp_path / "a.xlsx")
     wb = ET.fromstring(zipfile.ZipFile(arq).read("xl/workbook.xml"))
     assert [s.get("name") for s in wb.find("m:sheets", NS)] == ["Ab"]
+
+
+def test_formula_em_coluna_de_data_nao_e_validada_como_data(tmp_path):
+    pasta = _escreve(tmp_path / "p", [{"nome": "A", "colunas": ["d"], "formatos": ["data"],
+                                       "linhas": [["=B2+1"], ["2026-10-01"]]}])
+    abas = ep.ler_planilha_json(pasta)
+    arq = ep.gerar_xlsx(abas, tmp_path / "a.xlsx")
+    est, sh = _xml_estilos(arq)
+    cel = {c.get("r"): c for c in sh.iter(f"{{{NS['m']}}}c")}
+    assert cel["A2"].find("m:f", NS).text == "B2+1" and cel["A2"].get("s") == cel["A3"].get("s") != "1"
+
+
+def test_larguras_precisam_ser_finitas(tmp_path):
+    for bad in ("NaN", "Infinity"):
+        pasta = tmp_path / bad
+        pasta.mkdir()
+        (pasta / "planilha.json").write_text('{"abas": [{"nome": "A", "colunas": ["x"], "larguras": [%s]}]}' % bad)
+        with pytest.raises(ValueError, match="larguras"):
+            ep.ler_planilha_json(pasta)
+
+
+@pytest.mark.parametrize("nome", ["SEERRO", "HOJE", "ARRED", "CONT.VALORES", "E", "OU", "AGORA", "MÁXIMO", "MAXIMO",
+                                  "MÍNIMO", "MINIMO", "PROCH", "ÍNDICE", "INDICE", "CORRESP", "soma"])
+def test_mais_nomes_em_portugues_recusados(tmp_path, nome):
+    pasta = _escreve(tmp_path / "p", [{"nome": "A", "colunas": ["x"], "linhas": [[f"={nome}(A1)"]]}])
+    with pytest.raises(ValueError, match="inglês"):
+        ep.ler_planilha_json(pasta)
+
+
+def test_nomes_em_ingles_parecidos_passam(tmp_path):
+    pasta = _escreve(tmp_path / "p", [{"nome": "A", "colunas": ["x"], "linhas": [
+        ["=INDEX(A:A,1)"], ["=MAX(A1:A3)"], ["=AND(A1,B1)"], ["=OR(A1,B1)"], ["=ROUND(A1,2)"], ["=IFERROR(A1,0)"]]}])
+    assert ep.ler_planilha_json(pasta)

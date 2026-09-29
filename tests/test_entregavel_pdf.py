@@ -177,7 +177,7 @@ def test_carrossel_so_apaga_os_proprios_arquivos(tmp_path):
     car = tmp_path / "proj" / "pagina" / "imagens" / "carrossel"
     car.mkdir(parents=True)
     velhos = ("50-guia-do-pao-01.png", "50-guia-do-pao-99.png", "07-guia-do-pao-02.jpg")  # meus (qualquer NN)
-    alheios = ("50-guia-foto.png", "guia-do-pao-01.png", "50-guia-do-pao-x.png", "aluno.png", "50-guia-do-pao-01.webp")
+    alheios = ("50-guia-foto.png", "guia-do-pao-x.png", "50-guia-do-pao-x.png", "aluno.png", "50-guia-do-pao-01.webp")
     for nome in velhos + alheios:
         (car / nome).write_bytes(b"x")
     outro = tmp_path / "proj" / "entregaveis" / "guia"
@@ -361,3 +361,48 @@ def test_amostras_antigas_so_saem_depois_de_render_ok(tmp_path, monkeypatch):
     r = _gerar_ou_pular(p)
     assert r["amostras"][0].read_bytes() != b"velha" and sorted(x.name for x in (p / "previa").iterdir()) == [
         "amostra-1.png", "amostra-2.png"]
+
+
+def test_carrossel_apaga_tambem_o_formato_antigo_sem_prefixo(tmp_path):
+    pytest.importorskip("playwright")
+    p = _pasta(tmp_path, md="# Um\n\ntexto")
+    car = tmp_path / "car"
+    car.mkdir()
+    for nome in ("guia-do-pao-01.png", "guia-do-pao-02.png", "guia-do-pao-x.png", "outro-01.png"):
+        (car / nome).write_bytes(b"x")
+    ep.gerar(p, "azul-laranja", carrossel=car)
+    nomes = sorted(x.name for x in car.iterdir())
+    assert "guia-do-pao-01.png" not in nomes and "guia-do-pao-02.png" not in nomes
+    assert "guia-do-pao-x.png" in nomes and "outro-01.png" in nomes
+
+
+def test_ordem_invalida_em_portugues(tmp_path, capsys):
+    p = _pasta(tmp_path)
+    for v in ("0", "100", "x"):
+        assert ep.main(["--pasta", str(p), "--ordem", v]) == 1
+        err = capsys.readouterr().err
+        assert "--ordem" in err and "1 a 99" in err and "invalid" not in err and "argument" not in err
+
+
+def test_aviso_de_capa_antiga_nao_cita_paleta(tmp_path):
+    import os
+    p = _pasta(tmp_path, md="# Um\n\ntexto")
+    _capa_falsa(p, 100, 141)
+    os.utime(p / "capa.png", (1000, 1000))
+    os.utime(p / "meta.json", (2000, 2000))
+    aviso = _gerar_ou_pular(p)["avisos"][0]
+    assert "paleta" not in aviso and "título, subtítulo ou autor" in aviso
+
+
+def test_capa_jpeg_temporaria_some_mesmo_se_o_render_falha(tmp_path, monkeypatch):
+    pytest.importorskip("playwright")
+    p = _pasta(tmp_path, md="# Um\n\ntexto")
+    _capa_falsa(p, 100, 141)
+
+    def falha(*a, **k):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(ep.shutil, "copyfile", falha)
+    with pytest.raises(RuntimeError):
+        ep.gerar(p, "azul-laranja", carrossel=tmp_path / "car")
+    assert not list(p.glob(".*"))
