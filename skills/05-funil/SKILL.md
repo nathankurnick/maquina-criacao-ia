@@ -45,8 +45,8 @@ Pare e espere o aluno escolher. Depois grave `<P>/funil/funil.json` (crie a past
 ```json
 {"front":    {"nome": "Marmitas Já", "preco": 27},
  "bump":     {"nome": "Lista de compras inteligente", "preco": 9.9, "conversao": 0.2},
- "upsell":   {"nome": "Cardápio 30 dias", "preco": 67, "conversao": 0.06},
- "downsell": {"nome": "Cardápio 15 dias", "preco": 37, "conversao": 0.05}}
+ "upsell":   {"nome": "Cardápio 30 dias", "preco": 67, "conversao": 0.10},
+ "downsell": {"nome": "Cardápio 15 dias", "preco": 37, "conversao": 0.10}}
 ```
 
 Números de exemplo — use as faixas de referência e troque pelos seus quando tiver dados.
