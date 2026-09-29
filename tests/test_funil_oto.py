@@ -242,3 +242,26 @@ def test_definir_url(tmp_path, capsys):
     out = capsys.readouterr().out
     assert "O endereço mudou" in out and "atualize na plataforma" in out
     assert json.loads((p / "config.json").read_text())["url"] == "https://b.netlify.app"
+
+
+def test_sem_chave_diz_upsell_downsell_conforme_pasta(ambiente, tmp_path, capsys):
+    p = _pasta(tmp_path)
+    fo.main(["--pasta", str(p), "--publicar"])
+    assert "página de upsell" in capsys.readouterr().out
+    d = tmp_path / "downsell"
+    d.mkdir()
+    (d / "oto.json").write_text((p / "oto.json").read_text())
+    fo.main(["--pasta", str(d), "--publicar"])
+    assert "página de downsell" in capsys.readouterr().out
+
+
+def test_definir_url_com_publicar_erra(tmp_path, capsys):
+    p = _pasta(tmp_path)
+    assert fo.main(["--pasta", str(p), "--definir-url", "https://a.netlify.app", "--publicar"]) == 1
+    assert "use um de cada vez" in capsys.readouterr().err
+
+
+def test_definir_url_pasta_inexistente(tmp_path, capsys):
+    assert fo.main(["--pasta", str(tmp_path / "nada"), "--definir-url", "https://a.netlify.app"]) == 1
+    err = capsys.readouterr().err
+    assert "Não achei a pasta" in err and "Traceback" not in err

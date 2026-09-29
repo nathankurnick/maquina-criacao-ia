@@ -20,6 +20,8 @@ Pintar a vida transformada pelo produto que ele ACABOU de comprar (não o upsell
 
 ## BLOCO 3 — PROBLEMA DIMENSIONALIZADO (~300–500 palavras)
 
+> Se não houver relato real: `[cole aqui um relato real de cliente]` ou a lacuna entre saber e executar. Nunca invente prova.
+
 - Vira a chave: "mas eu preciso ser honesto com você sobre uma coisa..."
 - O problema deve ser o MOTIVO da criação do upsell (relatos de clientes é a fonte mais crível).
 - Dimensionalizar: cena por cena, o custo emocional e material do problema.

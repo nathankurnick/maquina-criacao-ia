@@ -287,7 +287,15 @@ def main(argv: "list[str] | None" = None) -> int:
         print(f'❌ Paleta "{args.paleta}" não existe. Use: {", ".join(PALETAS)}.', file=sys.stderr)
         return 1
     pasta = Path(args.pasta).resolve()
+    if args.definir_url and args.publicar:
+        print("❌ Use um de cada vez: --definir-url (guarda o link que você publicou na mão) OU --publicar "
+              "— use um de cada vez.", file=sys.stderr)
+        return 1
     if args.definir_url:
+        if not pasta.is_dir():
+            print(f"❌ Não achei a pasta {pasta}. Confira o caminho (a pasta do upsell ou do downsell).",
+                  file=sys.stderr)
+            return 1
         try:
             anterior = definir_url(pasta, args.definir_url)
         except (ValueError, OSError) as err:
@@ -313,11 +321,12 @@ def main(argv: "list[str] | None" = None) -> int:
                   f"abra esse site, vá na aba Deploys e arraste a pasta {pasta / 'site'} lá. "
                   "(Arrastar em app.netlify.com/drop cria um endereço NOVO.)")
         else:
+            nome = pasta.name if pasta.name in ("upsell", "downsell") else "upsell/downsell"
             print("ℹ️ A chave da Netlify não está configurada, então publique na mão (2 minutos):\n"
                   "   1. Entre (ou crie) sua conta na Netlify ANTES — sem login a página é apagada em ~1 hora.\n"
                   "   2. Abra https://app.netlify.com/drop\n"
                   f"   3. Arraste a pasta {pasta / 'site'}\n"
-                  "   4. Copie o link e me mande (é esse que vai na plataforma como página de upsell).")
+                  f"   4. Copie o link e me mande (é esse que vai na plataforma como página de {nome}).")
         print("   Pra publicar sozinho das próximas vezes: rode `maquina chaves` no Terminal (é interativo) "
               "e cole a chave da Netlify.")
         return 3

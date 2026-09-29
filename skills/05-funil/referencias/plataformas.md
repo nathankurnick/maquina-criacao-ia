@@ -9,10 +9,11 @@ pelo termo entre aspas. Quem configura é o aluno; você explica e confere.
 3. **Order bump** ("order bump") ligado ao produto principal, com a copy do `order-bump.md`.
 4. **Upsell** ("upsell", "one click", "funil de vendas"): produto do upsell criado; a página de
    upsell (link da Netlify do `funil_oto.py`) configurada como página depois da compra; o botão
-   de compra em 1 clique da plataforma (se existir) colado em `botao_html` do `oto.json`.
+   de compra em 1 clique da plataforma (se existir) colado em `botao_html` do `oto.json` (se o botão
+   aparece dentro do player, use `botao_no_player: true`).
 5. **Downsell**: mesma coisa, como destino do "não, obrigado" do upsell.
 6. **Página de obrigado**: depois do último passo, mande pra área de membros.
-7. **Pixel da Meta** no checkout e nas páginas (Sistema 02 já instala na página de vendas);
+7. **Pixel da Meta** no checkout e na página de vendas (a página de upsell não tem pixel);
    evento de compra (Purchase) configurado na plataforma.
 8. **Recuperação**: automação de carrinho abandonado e boleto/PIX (e-mail/WhatsApp) com as
    mensagens do `mensagens.md`.

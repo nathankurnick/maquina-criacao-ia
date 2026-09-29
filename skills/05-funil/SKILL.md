@@ -102,27 +102,28 @@ Siga o método em `referencias/upsell/metodologia.md`:
    executar. A IA não inventa relato, depoimento, número de alunos nem resultado.
 3. **Copy dos 5 blocos** ✋ (`referencias/upsell/copy-5-blocos.md`) em `<P>/funil/upsell/roteiro.md`
    (vídeo: roteiro pra gravar e subir no VTurb/YouTube; ou texto). Espere a revisão.
+   **Prova (bloco 3)**: no caso-exemplo os relatos e números eram reais. Sem relato real, use a
+   lacuna entre saber e executar ou `[cole aqui um relato real de cliente]`; custo do problema ou
+   estatística → "(confirme esta informação)". A IA nunca inventa prova.
 4. **Conteúdo do upsell** (produto SEPARADO, nunca dentro do front): escreva com as regras de
    formato do Sistema 03, mas em `<P>/funil/upsell/entregaveis/<item>/`, passando `--pasta` para lá.
    Nunca use `maquina oferta adicionar` para isso e nunca `--carrossel`. O aluno sobe cada PDF
    na plataforma como um produto separado.
 
-```bash
-PY="$HOME/.maquina/venv/bin/python"; S3="$HOME/.claude/skills/03-entregaveis/scripts"; "$PY" "$S3/entregavel_pdf.py" --pasta "<P>/funil/upsell/entregaveis/<item>" --paleta '<paleta>'
-```
+A pasta do item precisa ter `meta.json` e `conteudo.md`, como no SKILL do Sistema 03. Rode a capa ANTES do PDF (o 03 só embute a `capa.png` se ela já existir).
 
 ```bash
 PY="$HOME/.maquina/venv/bin/python"; S3="$HOME/.claude/skills/03-entregaveis/scripts"; "$PY" "$S3/entregavel_capa.py" --pasta "<P>/funil/upsell/entregaveis/<item>" --paleta '<paleta>' --arte '<descrição visual, sem texto>'
+```
+
+```bash
+PY="$HOME/.maquina/venv/bin/python"; S3="$HOME/.claude/skills/03-entregaveis/scripts"; "$PY" "$S3/entregavel_pdf.py" --pasta "<P>/funil/upsell/entregaveis/<item>" --paleta '<paleta>'
 ```
 
 **Ordem de construção**: faça o DOWNSELL primeiro (se houver). O `recusar_url` do downsell é a página
 de obrigado ou a área de membros da plataforma: PERGUNTE o link ao aluno. Publique o downsell; só
 então monte o upsell com `recusar_url` = link do downsell. Sem downsell, o `recusar_url` do upsell
 é o link de obrigado/área de membros. O `recusar_url` é obrigatório (o script recusa sem ele).
-
-**Prova (4.3 da copy)**: no caso-exemplo os relatos e números eram reais. Sem relato real, use a
-lacuna entre saber e executar ou `[cole aqui um relato real de cliente]`; custo do problema ou
-estatística → "(confirme esta informação)". A IA nunca inventa prova.
 
 Página do upsell — escreva `<P>/funil/upsell/oto.json`:
 
@@ -142,7 +143,8 @@ Página do upsell — escreva `<P>/funil/upsell/oto.json`:
 - `botao_html`: se a plataforma der um botão de compra em 1 clique, cole o código aqui (aí o
   `checkout_url` não é obrigatório).
 - `atraso_segundos`: o botão aparece depois desse tempo: use ≈ 60–70% da duração do vídeo (nunca
-  0 no formato vídeo). Se o botão estiver dentro do player, use `botao_no_player` em vez disso.
+  0 no formato vídeo). Com `botao_no_player`, defina o `atraso_segundos` do mesmo jeito (≈ 60–70% do vídeo), para o
+  "não, obrigado" aparecer junto com o botão do player.
 - Formato `texto`: `copy_abaixo` já vem como "Leia a mensagem acima até o final — seu acesso
   aparece em seguida.".
 - Paleta: `--paleta`, senão `pagina/config.json`, senão a do `oferta.md`, senão `azul-laranja`.
@@ -185,10 +187,20 @@ PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/05-funil/scripts"; 
 - Saída 1: mostre a mensagem (link de compra inválido, vídeo não reconhecido…) e corrija.
 - Saída 130: o aluno cancelou (Ctrl+C).
 
-Downsell (construído ANTES do upsell): repita em `<P>/funil/downsell/`. Ele reaproveita a estrutura
+Downsell (construído ANTES do upsell): repita em `<P>/funil/downsell/` (`oto.json` com `recusar_url` = obrigado/área de membros). Ele reaproveita a estrutura
 do roteiro do upsell num texto de página mais curto (formato `texto`), com a justificativa da queda
 de preço; não faça nova rodada de 12–17 nomes, a menos que o aluno queira. Conteúdo em
-`<P>/funil/downsell/entregaveis/<item>/`, como produto separado (mesmas regras).
+`<P>/funil/downsell/entregaveis/<item>/`, como produto separado (mesmas regras). Monte e, depois de publicar na mão, guarde o link:
+
+```bash
+PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/05-funil/scripts"; "$PY" "$S/funil_oto.py" --pasta "<P>/funil/downsell" --paleta '<paleta>' --publicar
+```
+
+```bash
+PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/05-funil/scripts"; "$PY" "$S/funil_oto.py" --pasta "<P>/funil/downsell" --definir-url 'https://<link-do-aluno>'
+```
+
+(`--definir-url` e `--publicar` não vão juntos: um de cada vez.)
 
 Reedição: o texto de um upsell em `texto` mora em `oto.json` (campo `texto`); o `roteiro.md` é a
 fonte: atualize os dois. Em vídeo, a página só muda se mudar headline ou links. Rodar

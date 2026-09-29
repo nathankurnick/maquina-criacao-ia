@@ -36,7 +36,7 @@ def test_meta_atingida_ou_nao(tmp_path):
     assert "✅" in fm.html_mapa(alto, fd.projetar(alto), "azul-laranja")
     so_front = _ler(tmp_path, {"front": {"nome": "F", "preco": 27}})
     h = fm.html_mapa(so_front, fd.projetar(so_front), "azul-laranja")
-    assert "⚠️" in h and "Upsell" not in h
+    assert "Sem upsell ainda" in h and "abaixo da meta" not in h and ">Upsell<" not in h
 
 
 def test_gerar_de_verdade(tmp_path):
@@ -82,7 +82,7 @@ def test_faixas_do_resumo(tmp_path):
     # bump grande sozinho NÃO conta: a meta vale só para o upsell
     baixo = _ler(tmp_path, {"front": {"nome": "F", "preco": 100}, "bump": {"nome": "B", "preco": 90, "conversao": 0.3}})
     h = fm.html_mapa(baixo, fd.projetar(baixo), "azul-laranja")
-    assert "⚠️ abaixo da meta de 25–30%" in h
+    assert "Sem upsell ainda — a meta de 25–30% é do upsell." in h and "abaixo da meta" not in h
     meio = _ler(tmp_path, _up(275))
     h = fm.html_mapa(meio, fd.projetar(meio), "azul-laranja")
     assert "✅ dentro da meta de 25–30%" in h and "otimistas" not in h

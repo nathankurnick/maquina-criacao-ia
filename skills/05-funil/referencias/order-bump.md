@@ -17,10 +17,12 @@ já está com o cartão na mão.
   `--pasta` para lá). Nunca use `maquina oferta adicionar` para o bump e nunca `--carrossel`. O aluno
   sobe o PDF na plataforma como um produto separado, ligado ao checkout como order bump.
 
-```bash
-PY="$HOME/.maquina/venv/bin/python"; S3="$HOME/.claude/skills/03-entregaveis/scripts"; "$PY" "$S3/entregavel_pdf.py" --pasta "<P>/funil/bump/entregaveis/<item>" --paleta '<paleta>'
-```
+A pasta do item precisa ter `meta.json` e `conteudo.md`, como no SKILL do Sistema 03. Rode a capa ANTES do PDF (o 03 só embute a `capa.png` se ela já existir).
 
 ```bash
 PY="$HOME/.maquina/venv/bin/python"; S3="$HOME/.claude/skills/03-entregaveis/scripts"; "$PY" "$S3/entregavel_capa.py" --pasta "<P>/funil/bump/entregaveis/<item>" --paleta '<paleta>' --arte '<descrição visual, sem texto>'
+```
+
+```bash
+PY="$HOME/.maquina/venv/bin/python"; S3="$HOME/.claude/skills/03-entregaveis/scripts"; "$PY" "$S3/entregavel_pdf.py" --pasta "<P>/funil/bump/entregaveis/<item>" --paleta '<paleta>'
 ```

@@ -75,16 +75,21 @@ def html_mapa(funil: dict, projecao: dict, paleta_nome: str) -> str:
             partes += [_seta("recusou o upsell"), f'<div class="linha">{_caixa_oferta("downsell", funil["downsell"])}</div>']
     partes += [_seta(), _caixa("Obrigado", "Área de membros", '<p class="conv">Boas-vindas e acesso (mensagens.md)</p>')]
     aumento = projecao["aumento_upsell_pct"]
-    if aumento < META_AUMENTO[0]:
+    sem_upsell = not funil.get("upsell")
+    if sem_upsell:
+        selo, fim = "", ""
+    elif aumento < META_AUMENTO[0]:
         selo, fim = "⚠️ abaixo da meta", ""
     elif aumento <= META_AUMENTO[1]:
         selo, fim = "✅ dentro da meta", ""
     else:
         selo, fim = "✅ acima da meta", " — confira se as conversões não estão otimistas"
+    linha_up = (f"Sem upsell ainda — a meta de {META_AUMENTO[0]:.0f}–{META_AUMENTO[1]:.0f}% é do upsell." if sem_upsell
+                else f"Aumento do upsell: {aumento:.0f}% — {selo} de {META_AUMENTO[0]:.0f}–{META_AUMENTO[1]:.0f}%{fim}")
     resumo = (f'<div class="resumo"><p class="grande">Ticket médio projetado (produto + bump + upsell + downsell): '
               f'<span>{brl(projecao["ticket_medio"])}</span></p>'
               f'<p>Aumento total sobre o produto principal: {projecao["aumento_pct"]:.0f}%</p>'
-              f'<p>Aumento do upsell: {aumento:.0f}% — {selo} de {META_AUMENTO[0]:.0f}–{META_AUMENTO[1]:.0f}%{fim}</p>'
+              f'<p>{linha_up}</p>'
               '<p class="nota">A meta vale só para o upsell (conversão × ticket do upsell ÷ produto principal). '
               'Conversões são números de referência — troque pelos seus quando tiver dados.</p></div>')
     return (f'<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Mapa do funil</title>'
@@ -177,7 +182,7 @@ def main(argv: "list[str] | None" = None) -> int:
         return 1
     p = r["projecao"]
     print(f"✅ Mapa: {r['png']}")
-    print(f"   Ticket médio projetado: {brl(p['ticket_medio'])} (+{p['aumento_pct']:.0f}% sobre o produto principal; upsell +{p['aumento_upsell_pct']:.0f}%)")
+    print(f"   Ticket médio projetado: {brl(p['ticket_medio'])} (+{p['aumento_pct']:.0f}% sobre o produto principal; {'upsell +%.0f%%' % p['aumento_upsell_pct'] if p['aumento_upsell_pct'] else 'sem upsell ainda — a meta de 25–30% é do upsell'})")
     return 0
 
 
