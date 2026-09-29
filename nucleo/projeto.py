@@ -46,6 +46,14 @@ def criar_projeto(nome: str) -> Path:
 
 
 def abrir_projeto(slug: str) -> Path:
+    try:
+        valido = bool(slug) and slug == slugify(slug)
+    except MaquinaErro:
+        valido = False
+    if not valido:
+        raise MaquinaErro(
+            f'Nome de projeto inválido: "{slug}". Veja os seus com: maquina projeto listar'
+        )
     pasta = pasta_projetos() / slug
     if not pasta.is_dir():
         raise MaquinaErro(
@@ -77,7 +85,13 @@ def ler_oferta(pasta: Path) -> "Oferta | None":
     arquivo = pasta / "oferta.md"
     if not arquivo.exists():
         return None
-    texto = arquivo.read_text(encoding="utf-8")
+    try:
+        texto = arquivo.read_text(encoding="utf-8")
+    except UnicodeDecodeError as e:
+        raise MaquinaErro(
+            f"Não consegui ler o arquivo {arquivo} (caracteres estranhos). "
+            "Peça ao Claude pra consertar o oferta.md."
+        ) from e
     dados, corpo = {}, texto
     if texto.startswith("---\n"):
         fim = texto.find("\n---", 4)

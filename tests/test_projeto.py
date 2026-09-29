@@ -72,3 +72,17 @@ def test_campos_faltando():
     assert campos_faltando(Oferta(nome="X", preco="R$ 10")) == [
         "nicho", "avatar", "promessa", "mecanismo",
     ]
+
+
+@pytest.mark.parametrize("slug", ["..", "", "a/b", "../x", "Meu Projeto", "."])
+def test_abrir_projeto_rejeita_slug_invalido(ambiente, slug):
+    with pytest.raises(MaquinaErro, match="Nome de projeto inválido"):
+        abrir_projeto(slug)
+
+
+def test_ler_oferta_com_bytes_invalidos_da_erro_amigavel(ambiente):
+    from nucleo.projeto import ler_oferta
+    pasta = criar_projeto("x")
+    (pasta / "oferta.md").write_bytes(b"---\nnome: \xff\xfe\n---\n")
+    with pytest.raises(MaquinaErro, match="oferta.md"):
+        ler_oferta(pasta)
