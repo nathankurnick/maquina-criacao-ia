@@ -28,7 +28,7 @@ COLUNAS = ["Anúncio", "Ângulo", "Formato", "Criativo/Hook", "Público", "Orça
 
 def _seguro(v):
     """Célula que começa com = + - @ vira fórmula no Excel; um espaço na frente segura."""
-    return f" {v}" if isinstance(v, str) and v.startswith(("=", "+", "-", "@")) else v
+    return f" {v}" if isinstance(v, str) and v.startswith(("=", "+", "-", "@", "\t", "\r")) else v
 
 
 def _registrar_log(texto: str) -> None:
@@ -52,6 +52,10 @@ def _avisos_md(anuncio: dict) -> str:
     return "".join(f"\n> ⚠️ {a}" for a in avisos) + ("\n" if avisos else "")
 
 
+def _link(link: str) -> str:
+    return link or "⚠️ Publique a página no Sistema 02 e cole o link aqui"
+
+
 def textos_md(anuncios: list[dict], link: str, pasta_criativos: Path) -> str:
     partes = ["# Textos dos anúncios estáticos\n",
               "Pra cada anúncio: suba as imagens, cole o texto principal, o título, a descrição, escolha o botão e o link.\n"]
@@ -62,17 +66,17 @@ def textos_md(anuncios: list[dict], link: str, pasta_criativos: Path) -> str:
                     if (Path(pasta_criativos) / f"{a['id']}-{fmt}.jpg").exists()]
         partes.append(
             f"\n## {a['id']} — {a['angulo']}\n\n"
-            f"- **Imagens:** {', '.join(arquivos) if arquivos else 'ainda não montadas (rode o anuncio_criativo.py)'}\n"
-            f"- **Texto principal:**\n\n{a['texto_principal']}\n\n"
+            f"- **Imagens:** {', '.join(arquivos) if arquivos else 'imagens ainda não montadas'}\n"
+            f"- **Texto principal:**\n\n```text\n{a['texto_principal']}\n```\n\n"
             f"- **Título:** {a['titulo']}\n"
             f"- **Descrição:** {a['descricao'] or '—'}\n"
             f"- **Botão:** {a['cta']}\n"
-            f"- **Link:** {link or '⚠️ Publique a página no Sistema 02 e cole o link aqui'}\n"
+            f"- **Link:** {_link(link)}\n"
             f"{_avisos_md(a)}")
     return "".join(partes)
 
 
-def roteiros_md(anuncios: list[dict]) -> str:
+def roteiros_md(anuncios: list[dict], link: str = "") -> str:
     videos = [a for a in anuncios if a["formato"] == "video"]
     if not videos:
         return ""
@@ -85,7 +89,8 @@ def roteiros_md(anuncios: list[dict]) -> str:
             f"\n## {a['id']} — {a['angulo']}\n\n### Hooks (primeiros 3 segundos)\n\n{hooks}\n\n"
             f"### Corpo\n\n{a['corpo']}\n\n### Final (CTA falado)\n\n{a['cta_falado']}\n\n"
             f"### Cenas sugeridas\n\n{cenas}\n\n### Texto do anúncio\n\n{a['texto_principal']}\n\n"
-            f"- **Título:** {a['titulo']}\n- **Botão:** {a['cta']}\n{_avisos_md(a)}")
+            f"- **Título:** {a['titulo']}\n- **Descrição:** {a['descricao'] or '—'}\n"
+            f"- **Botão:** {a['cta']}\n- **Link:** {_link(link)}\n{_avisos_md(a)}")
     return "".join(partes)
 
 
@@ -115,17 +120,24 @@ def exportar(pasta_projeto: Path) -> dict:
     anuncios = ler_anuncios(pasta)
     link = destino(pasta_projeto)
     r = {"textos": _gravar(pasta / "textos.md", textos_md(anuncios, link, pasta / "criativos")), "roteiros": None}
-    roteiros = roteiros_md(anuncios)
+    roteiros = roteiros_md(anuncios, link)
     if roteiros:
         r["roteiros"] = _gravar(pasta / "roteiros.md", roteiros)
+    else:
+        (pasta / "roteiros.md").unlink(missing_ok=True)
     linhas = linhas_plano(anuncios)
     if gerar_xlsx is not None:
         r["plano"] = gerar_xlsx([{"nome": "Plano de teste", "colunas": COLUNAS, "linhas": linhas,
                                   "larguras": [18, 28, 10, 40, 22, 18, 12, 30]}], pasta / "plano-de-teste.xlsx")
     else:
         buf = io.StringIO()
-        csv.writer(buf).writerows([COLUNAS] + linhas)
+        csv.writer(buf, delimiter=";").writerows([COLUNAS] + linhas)
         r["plano"] = _gravar(pasta / "plano-de-teste.csv", "﻿" + buf.getvalue())
+    (pasta / ("plano-de-teste.csv" if r["plano"].suffix == ".xlsx" else "plano-de-teste.xlsx")).unlink(missing_ok=True)
+    ids = {a["id"] for a in anuncios}
+    criativos = pasta / "criativos"
+    r["orfaos"] = sorted(f for f in criativos.glob("*.jpg")
+                         if f.stem.rsplit("-", 1)[0] not in ids) if criativos.is_dir() else []
     r["link"] = link
     return r
 
@@ -157,6 +169,8 @@ def main(argv: "list[str] | None" = None) -> int:
     if r["roteiros"]:
         print(f"✅ Roteiros: {r['roteiros']}")
     print(f"✅ Plano de teste: {r['plano']}")
+    for o in r["orfaos"]:
+        print(f"⚠️ {o.name} é de um anúncio que não está mais no anuncios.json (não apaguei; apague se não usar).")
     if not r["link"]:
         print("⚠️ A página ainda não tem endereço salvo — publique no Sistema 02 e rode de novo pra preencher o link.")
     return 0

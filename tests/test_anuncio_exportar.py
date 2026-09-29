@@ -107,3 +107,60 @@ def test_ctrl_c(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(ae, "exportar", boom)
     assert ae.main(["--projeto", str(tmp_path)]) == 130
     assert "Cancelado." in capsys.readouterr().err
+
+
+def test_sem_videos_apaga_roteiros_velho(tmp_path):
+    p = _projeto(tmp_path)
+    ae.exportar(p)
+    assert (p / "anuncios" / "roteiros.md").exists()
+    j = p / "anuncios" / "anuncios.json"
+    dados = json.loads(j.read_text(encoding="utf-8"))
+    dados["anuncios"] = dados["anuncios"][:1]
+    j.write_text(json.dumps(dados), encoding="utf-8")
+    ae.exportar(p)
+    assert not (p / "anuncios" / "roteiros.md").exists()
+
+
+def test_apaga_plano_do_outro_formato(tmp_path, monkeypatch):
+    p = _projeto(tmp_path)
+    (p / "anuncios" / "plano-de-teste.xlsx").write_bytes(b"x")
+    monkeypatch.setattr(ae, "gerar_xlsx", None)
+    ae.exportar(p)
+    assert not (p / "anuncios" / "plano-de-teste.xlsx").exists()
+    assert (p / "anuncios" / "plano-de-teste.csv").exists()
+
+
+def test_orfaos_listados(tmp_path, capsys):
+    p = _projeto(tmp_path)
+    c = p / "anuncios" / "criativos"
+    c.mkdir()
+    (c / "dor-1x1.jpg").write_bytes(b"x")
+    (c / "velho-1x1.jpg").write_bytes(b"x")
+    (c / "velho-9x16.jpg").write_bytes(b"x")
+    r = ae.exportar(p)
+    assert [o.name for o in r["orfaos"]] == ["velho-1x1.jpg", "velho-9x16.jpg"]
+    assert (c / "velho-1x1.jpg").exists()
+    ae.main(["--projeto", str(p)])
+    out = capsys.readouterr().out
+    assert "⚠️" in out and "velho-1x1.jpg" in out and "dor-1x1.jpg" not in out
+
+
+def test_roteiros_com_link_e_descricao():
+    md = ae.roteiros_md([dict(ANUNCIOS[1], descricao="Desc do vídeo")], "https://x.app")
+    assert "**Link:** https://x.app" in md and "**Descrição:** Desc do vídeo" in md
+    assert "Publique a página" in ae.roteiros_md([ANUNCIOS[1]], "")
+
+
+def test_textos_bloco_e_sem_rode_o_script(tmp_path):
+    md = ae.textos_md(ANUNCIOS, "", tmp_path)
+    assert "```text\nChega de cozinhar todo dia.\n```" in md
+    assert "imagens ainda não montadas" in md and "anuncio_criativo" not in md
+
+
+def test_csv_ponto_e_virgula_e_guarda_de_formula(tmp_path, monkeypatch):
+    p = _projeto(tmp_path)
+    monkeypatch.setattr(ae, "gerar_xlsx", None)
+    r = ae.exportar(p)
+    linhas = list(csv.reader(r["plano"].open(encoding="utf-8-sig"), delimiter=";"))
+    assert linhas[0][0] == "Anúncio" and len(linhas[0]) == 8
+    assert ae._seguro("\tx").startswith(" ") and ae._seguro("\rx").startswith(" ")
