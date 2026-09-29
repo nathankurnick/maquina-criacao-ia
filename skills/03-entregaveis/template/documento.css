@@ -1,0 +1,42 @@
+/* template/documento.css — A4 */
+@page{size:A4;margin:18mm 16mm 20mm}
+@page :first{margin:0}
+*{box-sizing:border-box}
+body{margin:0;font-family:Georgia,"Times New Roman",serif;font-size:11.5pt;line-height:1.6;color:#1f2328}
+h1,h2,h3{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.25;color:var(--pg-texto-escuro)}
+h1{font-size:24pt;margin:0 0 14pt;padding-bottom:8pt;border-bottom:3px solid var(--pg-destaque);break-before:page}
+h2{font-size:16pt;margin:20pt 0 8pt}
+h3{font-size:13pt;margin:16pt 0 6pt}
+p{margin:0 0 9pt}
+a{color:var(--pg-fundo-medio)}
+ul,ol{margin:0 0 10pt;padding-left:20pt}
+li{margin-bottom:4pt}
+.checklist{list-style:none;padding-left:0}
+.checklist li{position:relative;padding-left:22pt;margin-bottom:7pt}
+.checklist li::before{content:"";position:absolute;left:0;top:2pt;width:12pt;height:12pt;border:1.5px solid var(--pg-destaque);border-radius:3px}
+.checklist li.feito::before{background:var(--pg-destaque)}
+.caixa{margin:12pt 0;padding:10pt 12pt;border-left:4px solid var(--pg-destaque);background:var(--pg-fundo-claro);border-radius:4px;break-inside:avoid}
+.caixa p{margin:0}
+.caixa.atencao{border-left-color:#dc2626;background:#fef2f2}
+.caixa.exemplo{border-left-color:var(--pg-fundo-medio)}
+table{width:100%;border-collapse:collapse;margin:10pt 0 14pt;font-size:10pt;break-inside:avoid}
+th{background:var(--pg-fundo);color:var(--pg-texto-claro);text-align:left;padding:6pt}
+td{padding:6pt;border-bottom:1px solid #d0d7de}
+tr:nth-child(even) td{background:var(--pg-fundo-claro)}
+figure{margin:10pt 0;text-align:center;break-inside:avoid}
+figure img{max-width:100%;max-height:160mm}
+code{font-family:Menlo,Consolas,monospace;font-size:9.5pt;background:#f0f0f0;padding:1pt 3pt;border-radius:3px}
+hr{border:0;border-top:1px solid #d0d7de;margin:16pt 0}
+.capa{width:210mm;height:297mm;break-after:page;position:relative;overflow:hidden;background:linear-gradient(160deg,var(--pg-fundo) 0%,var(--pg-fundo-medio) 100%);color:var(--pg-texto-claro);display:flex;flex-direction:column;justify-content:center;padding:0 22mm}
+.capa img.capa-imagem{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.capa .tipo{font-family:system-ui,sans-serif;font-size:11pt;letter-spacing:.2em;text-transform:uppercase;color:var(--pg-destaque);margin-bottom:10mm}
+.capa h1.capa-titulo{border:0;break-before:auto;font-size:38pt;color:var(--pg-texto-claro);margin:0 0 8mm;padding:0}
+.capa .capa-subtitulo{font-family:system-ui,sans-serif;font-size:15pt;opacity:.85;margin:0}
+.capa .capa-autor{position:absolute;bottom:22mm;left:22mm;font-family:system-ui,sans-serif;font-size:11pt;opacity:.8}
+.capa .faixa{position:absolute;left:22mm;top:40mm;width:30mm;height:4px;background:var(--pg-destaque)}
+.sumario{break-after:page}
+.sumario h2{font-size:20pt;margin-top:0;border-bottom:3px solid var(--pg-destaque);padding-bottom:6pt}
+.sumario ol{list-style:none;padding:0}
+.sumario li{padding:5pt 0;border-bottom:1px dotted #c0c6cc}
+.sumario li.n2{padding-left:16pt;font-size:10.5pt;color:#57606a}
+.sumario a{color:inherit;text-decoration:none}
