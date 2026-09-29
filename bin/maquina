@@ -2,9 +2,10 @@
 # bin/maquina — chama o núcleo instalado em ~/.maquina
 MAQUINA_HOME="${MAQUINA_HOME:-$HOME/.maquina}"
 export MAQUINA_HOME
-export PYTHONPATH="$MAQUINA_HOME${PYTHONPATH:+:$PYTHONPATH}"
-if [ ! -x "$MAQUINA_HOME/venv/bin/python" ]; then
+PY="$MAQUINA_HOME/venv/bin/python"
+if [ ! -x "$PY" ]; then
   echo "❌ A Máquina não está instalada direito. Rode o instalar.sh de novo." >&2
   exit 1
 fi
-exec "$MAQUINA_HOME/venv/bin/python" -m nucleo.cli "$@"
+# -I: ignora a pasta atual e PYTHONPATH (uma pasta "nucleo" do aluno não pode sobrepor a instalada)
+exec "$PY" -I -c 'import sys, os; sys.path.insert(0, os.environ["MAQUINA_HOME"]); from nucleo.cli import main; sys.exit(main())' "$@"

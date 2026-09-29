@@ -76,7 +76,7 @@ mv "$MAQUINA_HOME/nucleo.novo" "$MAQUINA_HOME/nucleo"
 cp "$AQUI/VERSION" "$MAQUINA_HOME/VERSION"
 
 mkdir -p "$SKILLS_DIR"
-for pasta in "$AQUI"/skills/*/; do
+for pasta in "${MAQUINA_SKILLS_SRC:-$AQUI/skills}"/*/; do
   [ -f "${pasta}SKILL.md" ] || continue
   nome="$(basename "$pasta")"
   rm -rf "$SKILLS_DIR/$nome"
