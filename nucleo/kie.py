@@ -1,6 +1,7 @@
 """Cliente KIE (Nano Banana pra imagem; Kling no modo avançado)."""
 import http.client
 import json
+import os
 import time
 import urllib.error
 import urllib.parse
@@ -114,4 +115,36 @@ def baixar(url: str, destino: Path) -> Path:
             destino.write_bytes(r.read())
     except (OSError, http.client.HTTPException) as e:  # inclui HTTPError, URLError, timeout, disco
         raise KieErro("O arquivo foi gerado, mas não consegui baixar. Tente de novo.") from e
+    return destino
+
+
+_ASSINATURAS = (b"\x89PNG\r\n\x1a\n", b"\xff\xd8\xff")
+
+
+def _e_imagem(arq: Path) -> bool:
+    try:
+        with open(arq, "rb") as f:
+            cab = f.read(12)
+    except OSError:
+        return False
+    return cab.startswith(_ASSINATURAS) or (cab[:4] == b"RIFF" and cab[8:12] == b"WEBP")
+
+
+def gerar_imagem(chave: str, prompt: str, proporcao: str, destino: Path, modelo: str = "nano-banana-2",
+                 limite: float = 150) -> Path:
+    destino = Path(destino)
+    tid = criar_tarefa(chave, modelo, {"prompt": prompt, "aspect_ratio": proporcao, "output_format": "png"})
+    resultado = aguardar(chave, tid, intervalo=5, limite=limite)
+    urls = resultado.get("resultUrls") if isinstance(resultado, dict) else None
+    if not urls:
+        raise KieErro("A KIE terminou mas não devolveu a imagem. Tente de novo.")
+    tmp = destino.with_name(f".{destino.name}.baixando")
+    try:
+        baixar(urls[0], tmp)
+        if not _e_imagem(tmp):
+            raise KieErro("A KIE devolveu um arquivo que não é imagem.")
+        os.replace(tmp, destino)
+    finally:
+        if tmp.exists():
+            tmp.unlink()
     return destino

@@ -1,0 +1,23 @@
+*{box-sizing:border-box;margin:0}
+body{background:transparent}
+.quadro{position:relative;overflow:hidden;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:linear-gradient(160deg,var(--pg-fundo) 0%,var(--pg-fundo-medio) 100%);color:#fff;display:flex;flex-direction:column;padding:72px}
+.quadro .arte{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.quadro .veu{position:absolute;inset:0}
+.base .veu{background:linear-gradient(180deg,rgba(0,0,0,0) 35%,rgba(0,0,0,.78) 100%)}
+.topo .veu{background:linear-gradient(0deg,rgba(0,0,0,0) 35%,rgba(0,0,0,.78) 100%)}
+.centro .veu{background:rgba(0,0,0,.55)}
+.produto{position:relative;flex:1;display:flex;align-items:center;justify-content:center;min-height:0}
+.produto img{max-width:78%;max-height:100%;object-fit:contain;filter:drop-shadow(0 24px 40px rgba(0,0,0,.45))}
+.texto{position:relative}
+.base .texto{margin-top:auto}
+.centro{justify-content:center;text-align:center}
+.faixa{width:120px;height:12px;background:var(--pg-destaque);margin-bottom:32px}
+.centro .faixa{margin:0 auto 32px}
+.headline{font-weight:900;line-height:1.08;letter-spacing:-.01em;overflow-wrap:anywhere;text-shadow:0 4px 18px rgba(0,0,0,.35)}
+.headline .destaque{color:var(--pg-destaque)}
+.h-curta{font-size:104px}
+.h-media{font-size:84px}
+.h-longa{font-size:64px}
+.f9x16 .h-curta{font-size:120px}
+.f9x16 .h-media{font-size:96px}
+.f9x16 .h-longa{font-size:74px}

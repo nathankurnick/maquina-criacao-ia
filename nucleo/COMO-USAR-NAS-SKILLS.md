@@ -33,6 +33,9 @@ preco, entregaveis[], bonus[], garantia, link_checkout, paleta` + corpo livre.
 - Tarefas longas na KIE (`aguardar` pode levar minutos) devem rodar em segundo plano ou com
   um timeout explícito no Bash, e salvar o resultado de cada item assim que ele terminar
   (não só no fim do lote).
+- `gerar_imagem(chave, prompt, proporcao, destino, modelo="nano-banana-2", limite=150)` cria a imagem na KIE, confere que o
+  arquivo baixado é mesmo imagem (PNG/JPEG/WebP) e o grava de forma atômica em `destino`. Leva até ~150 s: rode com
+  timeout de 5 min, um item por vez. Falha vira `KieErro`/`KieErroPermanente`.
 - `KieErroPermanente` significa que repetir não adianta (chave, pedido ou tarefa recusados);
   qualquer outro `KieErro` é transitório.
 - `publicar_pasta(token, pasta, site_id)` devolve `{"site_id", "url"}`. Se o site salvo foi apagado

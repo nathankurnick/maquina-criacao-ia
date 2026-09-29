@@ -280,3 +280,22 @@ def test_requisicao_manda_user_agent(monkeypatch):
     monkeypatch.setattr(kie.urllib.request, "urlopen", falso)
     kie.creditos("k")
     assert vistos and vistos[0].startswith("Mozilla/5.0")
+
+
+def test_gerar_imagem_cria_valida_e_troca(tmp_path, monkeypatch):
+    monkeypatch.setattr(kie, "criar_tarefa", lambda chave, modelo, entrada: "t1")
+    monkeypatch.setattr(kie, "aguardar", lambda chave, tid, intervalo=5, limite=150: {"resultUrls": ["https://u/a.png"]})
+    monkeypatch.setattr(kie, "baixar", lambda url, destino: destino.write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 20) or destino)
+    destino = tmp_path / "arte.png"
+    assert kie.gerar_imagem("k", "cena", "1:1", destino) == destino
+    assert destino.read_bytes().startswith(b"\x89PNG")
+    assert [p.name for p in tmp_path.iterdir()] == ["arte.png"]
+
+
+def test_gerar_imagem_recusa_arquivo_que_nao_e_imagem(tmp_path, monkeypatch):
+    monkeypatch.setattr(kie, "criar_tarefa", lambda chave, modelo, entrada: "t1")
+    monkeypatch.setattr(kie, "aguardar", lambda chave, tid, intervalo=5, limite=150: {"resultUrls": ["https://u/a"]})
+    monkeypatch.setattr(kie, "baixar", lambda url, destino: destino.write_bytes(b"<html>erro</html>") or destino)
+    with pytest.raises(kie.KieErro, match="não é imagem"):
+        kie.gerar_imagem("k", "cena", "9:16", tmp_path / "arte.png")
+    assert list(tmp_path.iterdir()) == []
