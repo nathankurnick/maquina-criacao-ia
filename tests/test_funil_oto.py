@@ -119,3 +119,70 @@ def test_main_erros(tmp_path, capsys):
     assert fo.main(["--pasta", str(tmp_path / "nada")]) == 1
     assert "oto.json" in capsys.readouterr().err
     assert fo.main([]) == 1
+
+
+@pytest.mark.parametrize("entrada,trecho", [
+    ("https://vimeo.com/123456/abcdef1234", "player.vimeo.com/video/123456?h=abcdef1234"),
+    ("https://vimeo.com/123456?h=abcdef1234", "player.vimeo.com/video/123456?h=abcdef1234"),
+    ("https://player.vimeo.com/video/123456?h=abcdef1234", "player.vimeo.com/video/123456?h=abcdef1234"),
+    ("https://player.vimeo.com/video/123456", "player.vimeo.com/video/123456"),
+    ("https://www.youtube.com/embed/abcDEF12345", "youtube-nocookie.com/embed/abcDEF12345"),
+    ("https://www.youtube.com/live/abcDEF12345", "youtube-nocookie.com/embed/abcDEF12345"),
+    ("https://m.youtube.com/watch?v=abcDEF12345", "youtube-nocookie.com/embed/abcDEF12345"),
+    ("https://www.youtube.com/watch?list=x&v=abcDEF12345", "youtube-nocookie.com/embed/abcDEF12345"),
+])
+def test_embed_video_variantes(entrada, trecho):
+    assert trecho in fo.embed_video(entrada)
+
+
+@pytest.mark.parametrize("ruim", [
+    "https://evil.com/?u=youtube.com/watch?v=abcDEF12345",
+    "https://evilyoutube.com/watch?v=abcDEF12345",
+    "https://youtube.com.evil.com/watch?v=abcDEF12345",
+    "https://evil.com/vimeo.com/123456",
+])
+def test_embed_video_host_ancorado(ruim):
+    with pytest.raises(ValueError):
+        fo.embed_video(ruim)
+
+
+def _nav(pw, **kw):
+    try:
+        return pw.chromium.launch()
+    except Exception as e:
+        if "Executable doesn't exist" in str(e):
+            pytest.skip("Chromium do Playwright não instalado")
+        raise
+
+
+def test_botao_atraso_com_e_sem_js(tmp_path):
+    pytest.importorskip("playwright")
+    from playwright.sync_api import sync_playwright
+    p = _pasta(tmp_path, formato="texto", video="", texto="Oi.", atraso_segundos=1)
+    uri = fo.montar(p, "azul-laranja").as_uri()
+    with sync_playwright() as pw:
+        nav = _nav(pw)
+        pg = nav.new_page()
+        pg.goto(uri)
+        assert not pg.locator("#oferta").is_visible()
+        pg.wait_for_timeout(1600)
+        assert pg.locator("#oferta").is_visible()
+        sem_js = nav.new_context(java_script_enabled=False).new_page()
+        sem_js.goto(uri)
+        assert sem_js.locator("#oferta .botao").is_visible()
+        nav.close()
+
+
+def test_semtoken_mensagens_consistentes_com_o_02(ambiente, tmp_path, capsys):
+    p = _pasta(tmp_path)
+    fo.main(["--pasta", str(p), "--publicar"])
+    assert "maquina chaves" in capsys.readouterr().out
+    (p / "config.json").write_text(json.dumps({"url": "https://a.netlify.app"}))
+    fo.main(["--pasta", str(p), "--publicar"])
+    out = capsys.readouterr().out
+    assert "cria um endereço NOVO" in out and "maquina chaves" in out
+
+
+def test_texto_usa_cor_escura_explicita():
+    css = (fo.CSS).read_text(encoding="utf-8")
+    assert "color:var(--pg-texto-escuro)" in [l for l in css.splitlines() if l.startswith(".texto{")][0].replace(" ", "")

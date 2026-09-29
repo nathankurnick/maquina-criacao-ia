@@ -12,6 +12,7 @@ import re
 import shutil
 import sys
 import traceback
+import urllib.parse
 from pathlib import Path
 
 _HOME = os.environ.get("MAQUINA_HOME") or os.path.expanduser("~/.maquina")
@@ -62,16 +63,37 @@ def embed_video(v: str) -> str:
     v = (v or "").strip()
     if v.startswith("<"):
         return f'<div class="video">{v}</div>'
-    m = (re.search(r"youtube\.com/watch\?(?:.*&)?v=([\w-]{6,})", v) or re.search(r"youtu\.be/([\w-]{6,})", v)
-         or re.search(r"youtube\.com/shorts/([\w-]{6,})", v))
-    if m:
-        src = f"https://www.youtube-nocookie.com/embed/{m.group(1)}?rel=0"
-    else:
-        m = re.search(r"vimeo\.com/(\d+)", v)
-        if not m:
-            raise ValueError("o vídeo precisa ser um link do YouTube/Vimeo ou o código de incorporação do player "
-                             "(VTurb, Panda…)")
-        src = f"https://player.vimeo.com/video/{m.group(1)}"
+    try:
+        u = urllib.parse.urlparse(v)
+        host = (u.hostname or "").lower()
+    except ValueError:
+        u, host = None, ""
+    src = None
+    if u and u.scheme in ("http", "https"):
+        partes = [x for x in u.path.split("/") if x]
+        q = urllib.parse.parse_qs(u.query)
+        vid = None
+        if host in ("youtu.be", "www.youtu.be") and partes:
+            vid = partes[0]
+        elif host == "youtube.com" or host.endswith(".youtube.com") or host == "youtube-nocookie.com" \
+                or host.endswith(".youtube-nocookie.com"):
+            if partes[:1] == ["watch"] and q.get("v"):
+                vid = q["v"][0]
+            elif len(partes) >= 2 and partes[0] in ("embed", "shorts", "live"):
+                vid = partes[1]
+        if vid and re.fullmatch(r"[\w-]{6,}", vid):
+            src = f"https://www.youtube-nocookie.com/embed/{vid}?rel=0"
+        elif host in ("vimeo.com", "www.vimeo.com", "player.vimeo.com"):
+            n = next((x for x in partes if x.isdigit()), None)
+            if n:
+                i = partes.index(n)
+                h = (q.get("h") or [""])[0]
+                if not h and i + 1 < len(partes) and re.fullmatch(r"[0-9a-f]{6,}", partes[i + 1]):
+                    h = partes[i + 1]
+                src = f"https://player.vimeo.com/video/{n}" + (f"?h={h}" if re.fullmatch(r"\w+", h) else "")
+    if not src:
+        raise ValueError("o vídeo precisa ser um link do YouTube/Vimeo ou o código de incorporação do player "
+                         "(VTurb, Panda…)")
     return (f'<div class="video iframe"><iframe src="{e(src)}" title="Mensagem" '
             'allow="encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div>')
 
@@ -128,15 +150,16 @@ def html_oto(oto: dict, paleta_nome: str) -> str:
     recusar = (f'<br><a class="recusar" href="{e(oto["recusar_url"])}">{e(oto["recusar_texto"])}</a>'
                if oto["recusar_url"] else "")
     classe = "oferta escondida" if oto["atraso_segundos"] > 0 else "oferta"
-    script = ("<script>setTimeout(function(){var o=document.querySelector('.oferta');"
+    script = ("<script>setTimeout(function(){var o=document.getElementById('oferta');"
               f"if(o){{o.classList.remove('escondida');}}}},{oto['atraso_segundos'] * 1000});</script>"
               if oto["atraso_segundos"] > 0 else "")
     return (f'<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">'
+            "<script>document.documentElement.className+=' js'</script>"
             '<meta name="viewport" content="width=device-width, initial-scale=1">'
             f'<meta name="robots" content="noindex"><title>{e(oto["headline"])}</title>'
             f"<style>{variaveis}\n{CSS.read_text(encoding='utf-8')}</style></head><body>"
             f'<p class="aviso">{e(oto["pre_headline"])}</p><div class="caixa"><h1>{e(oto["headline"])}</h1>'
-            f'{miolo}<p class="abaixo">{e(oto["copy_abaixo"])}</p><div class="{classe}">{botao}{recusar}</div>'
+            f'{miolo}<p class="abaixo">{e(oto["copy_abaixo"])}</p><div id="oferta" class="{classe}">{botao}{recusar}</div>'
             f"</div>{script}</body></html>\n")
 
 
@@ -224,13 +247,16 @@ def main(argv: "list[str] | None" = None) -> int:
         url = _config(pasta).get("url", "")
         if url:
             print(f"ℹ️ Sua página já está no ar em {url}. Pra atualizar SEM mudar o endereço: entre na Netlify, "
-                  f"abra esse site, vá na aba Deploys e arraste a pasta {pasta / 'site'} lá.")
+                  f"abra esse site, vá na aba Deploys e arraste a pasta {pasta / 'site'} lá. "
+                  "(Arrastar em app.netlify.com/drop cria um endereço NOVO.)")
         else:
-            print("ℹ️ Sem a chave da Netlify, publique na mão:\n"
+            print("ℹ️ A chave da Netlify não está configurada, então publique na mão (2 minutos):\n"
                   "   1. Entre (ou crie) sua conta na Netlify ANTES — sem login a página é apagada em ~1 hora.\n"
                   "   2. Abra https://app.netlify.com/drop\n"
                   f"   3. Arraste a pasta {pasta / 'site'}\n"
                   "   4. Copie o link e me mande (é esse que vai na plataforma como página de upsell).")
+        print("   Pra publicar sozinho das próximas vezes: rode `maquina chaves` no Terminal (é interativo) "
+              "e cole a chave da Netlify.")
         return 3
     except (ValueError, MaquinaErro) as err:
         print(f"❌ {err}", file=sys.stderr)
