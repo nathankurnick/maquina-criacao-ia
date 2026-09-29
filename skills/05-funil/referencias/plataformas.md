@@ -1,0 +1,24 @@
+# Checklist de configuração na plataforma
+
+Os menus mudam de nome com o tempo — se não achar, procure na central de ajuda da plataforma
+pelo termo entre aspas. Quem configura é o aluno; você explica e confere.
+
+## Em qualquer plataforma
+1. Produto principal criado, com preço e a área de membros com os entregáveis (Sistema 03).
+2. Página de vendas (Sistema 02) com o link de checkout do produto principal.
+3. **Order bump** ("order bump") ligado ao produto principal, com a copy do `order-bump.md`.
+4. **Upsell** ("upsell", "one click", "funil de vendas"): produto do upsell criado; a página de
+   upsell (link da Netlify do `funil_oto.py`) configurada como página depois da compra; o botão
+   de compra em 1 clique da plataforma (se existir) colado em `botao_html` do `oto.json`.
+5. **Downsell**: mesma coisa, como destino do "não, obrigado" do upsell.
+6. **Página de obrigado**: depois do último passo, mande pra área de membros.
+7. **Pixel da Meta** no checkout e nas páginas (Sistema 02 já instala na página de vendas);
+   evento de compra (Purchase) configurado na plataforma.
+8. **Recuperação**: automação de carrinho abandonado e boleto/PIX (e-mail/WhatsApp) com as
+   mensagens do `mensagens.md`.
+9. Teste o funil inteiro com uma compra real de valor baixo (ou modo de teste, se houver) e peça
+   reembolso depois.
+
+## Kiwify / Hotmart / Payt / Eduzz
+Todas têm order bump e upsell pós-compra; os nomes exatos mudam. Termos pra buscar na ajuda:
+"order bump", "upsell de 1 clique", "funil", "página de obrigado", "pixel", "recuperação de carrinho".
