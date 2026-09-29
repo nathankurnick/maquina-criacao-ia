@@ -67,3 +67,13 @@ def test_skill_md_comandos_bash_autocontidos():
                 m = re.search(r'\$\{?%s\b' % var, linha)
                 if m:
                     assert re.search(r'(^|[\s;])%s=' % var, linha[:m.start()]), linha
+
+
+def test_skill_md_comandos_inline_autocontidos():
+    texto = (SKILL / "SKILL.md").read_text(encoding="utf-8")
+    texto = re.sub(r"```.*?```", "", texto, flags=re.S)
+    for cmd in (c for c in re.findall(r"`([^`\n]+)`", texto) if " " in c.strip()):
+        for var in ("PY", "S", "M"):
+            m = re.search(r'"\$%s\b' % var, cmd)
+            if m:
+                assert re.search(r'(^|[\s;])%s=' % var, cmd[:m.start()]), cmd

@@ -220,3 +220,10 @@ def test_whatsapp_sem_telefone_separa_por_anunciante():
                 "texto": f"texto {i}", "inicio": "2026-01-01"}
     r = of.analisar([ad(1, "A"), ad(2, "B")], date(2026, 9, 1))
     assert sorted(o["chave"] for o in r["ofertas"]) == ["whatsapp:A", "whatsapp:B"]
+
+
+def test_whatsapp_sem_pagina_nao_junta_anuncios():
+    def ad(i):
+        return {"id": str(i), "pagina": "", "link": "https://wa.me/", "texto": f"t{i}", "inicio": "2026-01-01"}
+    r = of.analisar([ad(1), ad(2)], date(2026, 9, 1))
+    assert sorted(o["chave"] for o in r["ofertas"]) == ["whatsapp:?1", "whatsapp:?2"]

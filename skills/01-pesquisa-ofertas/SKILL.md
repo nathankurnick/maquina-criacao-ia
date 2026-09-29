@@ -60,10 +60,18 @@ PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/01-pesquisa-ofertas
   ofereça continuar com o que foi salvo; senão pergunte se quer tentar de novo (em pasta nova).
 
 **Modo manual** (o aluno cola links):
-- Link da Biblioteca de Anúncios: rode `raspar.py --url "<link>" --saida "<pasta nova>"` para cada
-  link, cada um numa pasta nova, e depois rode o Passo 4 (`ofertas.py`) em cada uma. Avise que o
-  termômetro com poucos anúncios é fraco — apresente como **indicativo**.
-- Link de página de vendas: pule direto pro Passo 5 com cada link.
+- Link da Biblioteca de Anúncios: rode, um por link, em pastas novas `-link-1`, `-link-2`… (uma
+  por link):
+
+  ```bash
+  PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/01-pesquisa-ofertas/scripts"; "$PY" "$S/raspar.py" --url "<link>" --saida "<P>/pesquisa/AAAA-MM-DD-link-1"
+  ```
+
+  Depois rode o Passo 4 (`ofertas.py`) em cada pasta. Avise que o termômetro com poucos anúncios
+  é fraco — apresente como **indicativo**. Com vários links você terá várias tabelas, cada uma
+  numerada a partir de 1: mostre-as separadas e pergunte "link X, oferta N".
+- Link de página de vendas: pule direto pro Passo 5 com cada link; a pasta da oferta é
+  `<P>/pesquisa/oferta-<domínio-em-slug>` (ex.: `site.com.br` → `oferta-site-com-br`).
 
 ## Passo 4 — Ranquear e mostrar o top 10
 
@@ -110,9 +118,11 @@ Leia `pagina.txt` e `dados.json` e olhe `dobra.png` e as fatias listadas em `pri
 
 ## Passo 6 — Dissecar
 
-Siga `referencias/dissecacao.md` e escreva `<O>/dissecacao.md`. Use também os textos dos
-anúncios dessa oferta (`textos` em `ofertas.json`, e os anúncios em `anuncios.json` com o mesmo
-destino) pra listar os **ângulos de hook** — o Sistema 04 vai usar esse arquivo.
+Siga `referencias/dissecacao.md` e escreva `<O>/dissecacao.md`. Use também os `textos` da
+oferta em `ofertas.json` (já são as cópias mais repetidas) e, se quiser mais, os anúncios do mesmo
+anunciante em `anuncios.json` (campo `pagina`) pra listar os **ângulos de hook** — o Sistema 04
+vai usar esse arquivo. Sem `ofertas.json` (veio de link de página de vendas), tire os ângulos da
+própria página ou de textos de anúncio que o aluno colar.
 Mostre ao aluno um resumo curto (promessa, mecanismo, preço, bônus, garantia, bump, 3 ângulos).
 
 ## Passo 7 — Modelar a oferta do aluno
@@ -133,7 +143,8 @@ apóstrofo dentro do valor vira `'\''`:
 ```bash
 M="$(command -v maquina || echo "$HOME/.local/bin/maquina")"; "$M" oferta definir <slug> nome='...' nicho='...' avatar='...' promessa='...' mecanismo='...' preco='R$ 97,00' garantia='...'
 M="$(command -v maquina || echo "$HOME/.local/bin/maquina")"; "$M" oferta adicionar <slug> entregaveis '<item>'      # um por item
-M="$(command -v maquina || echo "$HOME/.local/bin/maquina")"; "$M" oferta adicionar <slug> bonus '<item>'            # item que começa com "-": use -- antes
+M="$(command -v maquina || echo "$HOME/.local/bin/maquina")"; "$M" oferta adicionar <slug> bonus '<item>'
+M="$(command -v maquina || echo "$HOME/.local/bin/maquina")"; "$M" oferta adicionar <slug> bonus -- '-50% no combo'   # item que começa com "-": use --
 M="$(command -v maquina || echo "$HOME/.local/bin/maquina")"; "$M" oferta faltando <slug>                            # deve voltar vazio
 ```
 
