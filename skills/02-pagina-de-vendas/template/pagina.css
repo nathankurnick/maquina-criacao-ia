@@ -1,0 +1,84 @@
+/* Visual dos 12 blocos do Gerador (Tailwind) em CSS puro. Cores vêm das variáveis --pg-* da paleta. */
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.5;color:var(--pg-texto-escuro);background:#fff;overflow-wrap:anywhere}
+img{max-width:100%;display:block}
+h1,h2,h3,p{margin:0}
+.secao{padding:48px 16px}
+.escura{background:var(--pg-fundo);color:var(--pg-texto-claro)}
+.media{background:var(--pg-fundo-medio);color:var(--pg-texto-claro)}
+.clara{background:var(--pg-fundo-claro);color:var(--pg-texto-escuro)}
+.branca{background:#fff;color:var(--pg-texto-escuro)}
+.borda-topo{border-top:4px solid var(--pg-destaque)}
+.caixa{margin:0 auto;max-width:1024px}
+.caixa-media{max-width:896px}
+.caixa-estreita{max-width:768px}
+.centro{text-align:center}
+h1{font-size:30px;line-height:1.2;font-weight:800}
+h2{font-size:24px;line-height:1.25;font-weight:800;text-align:center}
+h3{font-size:16px;font-weight:700}
+.sub{margin-top:12px;text-align:center;opacity:.75}
+.destaque{color:var(--pg-destaque)}
+.badge{display:inline-block;margin-bottom:16px;padding:4px 16px;border:1px solid var(--pg-destaque);border-radius:999px;font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
+.hero{padding-top:40px}
+.logo{margin:0 auto 24px;height:48px;width:auto}
+.subheadline{margin-top:20px;font-size:16px;opacity:.9}
+.cta{display:block;width:100%;margin-top:32px;padding:16px 32px;border-radius:12px;background:var(--pg-cta);color:var(--pg-cta-texto);font-weight:800;font-size:16px;text-align:center;text-decoration:none}
+.grade{display:grid;gap:20px;margin-top:32px}
+.cartao{border-radius:16px;padding:24px}
+.cartao .desc{margin-top:8px;font-size:14px;opacity:.85}
+.cartao-claro{background:var(--pg-fundo-claro);border:1px solid rgba(0,0,0,.1)}
+.cartao-borda{border:1px solid rgba(0,0,0,.1);text-align:center}
+.cartao-vidro{background:rgba(255,255,255,.05);box-shadow:inset 0 0 0 1px rgba(255,255,255,.1)}
+.icone{display:block;width:28px;height:28px;color:var(--pg-destaque)}
+.cartao-vidro .icone+h3{margin-top:16px}
+.rotulo{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--pg-destaque)}
+.rotulo+h3{margin-top:8px}
+.valor{margin-top:16px;font-size:14px}
+.valor s{opacity:.6}
+.valor strong{color:var(--pg-destaque);font-weight:800}
+.carrossel{display:flex;gap:16px;overflow-x:auto;scroll-snap-type:x mandatory;margin-top:32px;padding-bottom:16px}
+.carrossel img{flex:0 0 auto;width:256px;height:auto;scroll-snap-align:center;border-radius:12px;border:1px solid rgba(0,0,0,.1);background:#fff;box-shadow:0 4px 6px rgba(0,0,0,.1)}
+.lista-check{list-style:none;margin:32px 0 0;padding:0;display:grid;gap:12px}
+.lista-check li{display:flex;gap:12px;padding:16px;border-radius:12px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.check{color:var(--pg-destaque);font-weight:900}
+.item-titulo{font-weight:700}
+.lista-check .desc{font-size:14px;opacity:.8}
+.nota{margin-top:24px;text-align:center;font-size:12px;opacity:.6}
+.depoimentos img{width:100%;border-radius:12px;border:1px solid rgba(0,0,0,.1);background:#fff}
+.planos .grade{margin-top:40px}
+.plano{position:relative;background:#fff;border-radius:16px;padding:24px;box-shadow:0 10px 15px rgba(0,0,0,.1),0 0 0 1px rgba(0,0,0,.1)}
+.plano.em-destaque{box-shadow:0 10px 15px rgba(0,0,0,.1),0 0 0 2px var(--pg-destaque)}
+.selo{position:absolute;top:-12px;left:50%;transform:translateX(-50%);padding:4px 12px;border-radius:999px;background:var(--pg-destaque);color:var(--pg-cta-texto);font-size:12px;font-weight:700;white-space:nowrap}
+.plano h3{text-align:center;font-size:14px;font-weight:800;letter-spacing:.05em;text-transform:uppercase}
+.plano ul{list-style:none;margin:20px 0 0;padding:0;display:grid;gap:8px}
+.plano li{display:flex;gap:8px;font-size:14px}
+.precos{margin-top:24px;text-align:center}
+.preco-de{font-size:14px;opacity:.6;text-decoration:line-through}
+.preco-por{font-size:30px;font-weight:800}
+.plano .cta{display:block;width:100%;margin-top:20px}
+.garantia-caixa{margin:0 auto;max-width:672px;padding:32px;border:2px solid var(--pg-destaque);border-radius:16px;text-align:center}
+.garantia-caixa .rotulo{font-size:14px;font-weight:800}
+.garantia-dias{margin-top:8px;font-size:24px;font-weight:800}
+.garantia-texto{margin-top:16px;opacity:.8}
+.faq{margin-top:32px;display:grid;gap:12px}
+.faq details{background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.faq summary{cursor:pointer;font-weight:700}
+.faq details p{margin-top:8px;font-size:14px;opacity:.8}
+.rodape{padding:40px 16px;text-align:center}
+.rodape p{font-size:14px;opacity:.8}
+.rodape .disclaimer{margin-top:16px;font-size:12px;opacity:.6}
+@media (min-width:640px){
+  .secao{padding:80px 16px}
+  .hero{padding-top:64px}
+  h1{font-size:48px}
+  h2{font-size:30px}
+  .subheadline{font-size:18px}
+  .cta{display:inline-block;width:auto}
+  .grade-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .grade-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .carrossel img{width:288px}
+}
+@media (min-width:1024px){
+  .grade-3l{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
