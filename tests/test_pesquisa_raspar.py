@@ -256,3 +256,93 @@ def test_abrir_e_coletar_falha_no_goto_propaga_e_close_nao_mascara(monkeypatch):
     _instala_playwright_falso(monkeypatch, "goto")
     with pytest.raises(RuntimeError, match="net::"):
         raspar.abrir_e_coletar("https://x", 10)
+
+
+def test_ctrl_c_com_exit_do_playwright_falhando_sai_130(tmp_path, monkeypatch, capsys):
+    import sys
+    import types
+    mod = types.ModuleType("playwright.sync_api")
+
+    # corpo levanta KeyboardInterrupt (launch), __exit__ troca por RuntimeError
+    class _P:
+        class chromium:
+            @staticmethod
+            def launch(**k):
+                raise KeyboardInterrupt
+
+    class _CM2:
+        def __enter__(self):
+            return _P()
+
+        def __exit__(self, *a):
+            raise RuntimeError("driver morreu")
+    mod.sync_playwright = lambda: _CM2()
+    monkeypatch.setitem(sys.modules, "playwright", types.ModuleType("playwright"))
+    monkeypatch.setitem(sys.modules, "playwright.sync_api", mod)
+    assert raspar.main(["--termo", "x", "--saida", str(tmp_path)]) == 130
+    cap = capsys.readouterr()
+    assert "Pesquisa cancelada." in cap.err and "Traceback" not in cap.err
+
+
+def test_falha_ao_salvar_sai_1(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(raspar, "abrir_e_coletar", _fake([{"id": "1"}]))
+
+    def falha(*a, **k):
+        raise OSError("disco cheio")
+    monkeypatch.setattr(raspar, "_gravar", falha)
+    assert raspar.main(["--termo", "x", "--saida", str(tmp_path)]) == 1
+    err = capsys.readouterr().err
+    assert "Não consegui salvar os resultados em" in err and "espaço no disco" in err
+
+
+def test_ctrl_c_durante_salvamento_sai_130(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(raspar, "abrir_e_coletar", _fake([{"id": "1"}]))
+
+    def ci(*a, **k):
+        raise KeyboardInterrupt
+    monkeypatch.setattr(raspar, "_gravar", ci)
+    assert raspar.main(["--termo", "x", "--saida", str(tmp_path)]) == 130
+    assert "Pesquisa cancelada." in capsys.readouterr().err
+
+
+def test_pasta_somente_leitura_falha_antes_do_navegador(tmp_path, monkeypatch, capsys):
+    import os
+    d = tmp_path / "ro"
+    d.mkdir()
+    os.chmod(d, 0o500)
+    chamou = []
+    monkeypatch.setattr(raspar, "abrir_e_coletar", lambda *a, **k: chamou.append(1) or ([], False))
+    try:
+        if os.access(d, os.W_OK):
+            return  # rodando como root: não dá pra testar
+        assert raspar.main(["--termo", "x", "--saida", str(d)]) == 1
+    finally:
+        os.chmod(d, 0o700)
+    assert not chamou and "pasta" in capsys.readouterr().err
+
+
+def test_interrompido_sem_anuncios_sai_1(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(raspar, "abrir_e_coletar", _fake([], True))
+    assert raspar.main(["--termo", "x", "--saida", str(tmp_path)]) == 1
+    err = capsys.readouterr().err
+    assert OFERTA_MANUAL in err and "navegador" in err
+
+
+def test_remove_resultados_antigos(tmp_path, monkeypatch):
+    (tmp_path / "anuncios.json").write_text("[1]")
+    (tmp_path / "busca.json").write_text("{}")
+    monkeypatch.setattr(raspar, "abrir_e_coletar", _fake([]))
+    assert raspar.main(["--termo", "x", "--saida", str(tmp_path)]) == 2
+    assert not (tmp_path / "anuncios.json").exists() and not (tmp_path / "busca.json").exists()
+
+
+def test_aviso_de_parada_mostra_tipo_do_erro(tmp_path, monkeypatch, capsys):
+    _instala_playwright_falso(monkeypatch, "rolagem")
+    assert raspar.main(["--termo", "x", "--saida", str(tmp_path)]) == 0
+    assert "RuntimeError" in capsys.readouterr().out
+
+
+def test_rolagens_sem_valor_em_portugues(tmp_path, capsys):
+    assert raspar.main(["--termo", "x", "--saida", str(tmp_path), "--rolagens"]) == 1
+    err = capsys.readouterr().err
+    assert "expected" not in err and "--rolagens" in err
