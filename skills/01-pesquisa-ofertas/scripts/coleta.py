@@ -43,13 +43,23 @@ def _inteiro(v) -> "int | None":
         return None
 
 
+def _texto(v) -> str:
+    if isinstance(v, (dict, list)):
+        return ""
+    return "" if v is None else str(v)
+
+
+def _lista(v) -> list:
+    return v if isinstance(v, list) else []
+
+
 def _normalizar(obj: dict, snap: dict, aid: str) -> dict:
     videos = [_primeiro(v, "video_hd_url", "video_sd_url", "videoHdUrl", "videoSdUrl")
-              for v in (snap.get("videos") or []) if isinstance(v, dict)]
+              for v in _lista(snap.get("videos")) if isinstance(v, dict)]
     imagens = [_primeiro(i, "original_image_url", "resized_image_url", "originalImageUrl", "resizedImageUrl")
-               for i in (snap.get("images") or []) if isinstance(i, dict)]
+               for i in _lista(snap.get("images")) if isinstance(i, dict)]
     videos, imagens = [v for v in videos if v], [i for i in imagens if i][:3]
-    cards = [c for c in (snap.get("cards") or []) if isinstance(c, dict)]
+    cards = [c for c in _lista(snap.get("cards")) if isinstance(c, dict)]
     card = cards[0] if cards else {}
     corpo = snap.get("body") or {}
     if not isinstance(corpo, dict):
@@ -58,12 +68,12 @@ def _normalizar(obj: dict, snap: dict, aid: str) -> dict:
     texto = corpo.get("text") or marcacao.get("__html") or card.get("body") or ""
     return {
         "id": aid,
-        "pagina": snap.get("page_name") or obj.get("page_name") or obj.get("pageName") or "",
+        "pagina": _texto(snap.get("page_name") or obj.get("page_name") or obj.get("pageName")),
         "inicio": _inteiro(obj.get("start_date") or obj.get("startDate")),
         "repeticoes": _inteiro(obj.get("collation_count") or obj.get("collationCount")),
-        "cta": snap.get("cta_text") or "",
-        "link": snap.get("link_url") or snap.get("linkUrl") or card.get("link_url") or "",
-        "titulo": snap.get("title") or card.get("title") or "",
+        "cta": _texto(snap.get("cta_text")),
+        "link": _texto(snap.get("link_url") or snap.get("linkUrl") or card.get("link_url")),
+        "titulo": _texto(snap.get("title") or card.get("title")),
         "texto": str(texto)[:800],
         "videos": videos,
         "imagens": imagens,
@@ -91,8 +101,13 @@ class Coletor:
             if aid and isinstance(snap, dict) and snap:
                 aid = str(aid)
                 if aid not in self._vistos:
-                    self._vistos.add(aid)
-                    self.anuncios.append(_normalizar(obj, snap, aid))
+                    try:
+                        anuncio = _normalizar(obj, snap, aid)
+                    except Exception:  # último recurso: um anúncio ruim não derruba a colheita
+                        anuncio = None
+                    if anuncio is not None:
+                        self._vistos.add(aid)
+                        self.anuncios.append(anuncio)
             pilha.extend(reversed(list(obj.values())))
 
     def colher_html(self, html: str) -> None:
@@ -102,12 +117,12 @@ class Coletor:
                 try:
                     self.colher(json.loads(tentativa))
                     break
-                except ValueError:
+                except Exception:
                     continue
 
     def colher_graphql(self, texto: str) -> None:
         for pedaco in re.split(r"\r?\n(?=\{)", texto or ""):
             try:
                 self.colher(json.loads(pedaco))
-            except ValueError:
+            except Exception:
                 continue

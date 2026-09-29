@@ -105,3 +105,57 @@ def test_colher_suporta_json_muito_profundo():
     c = Coletor()
     c.colher(raiz)
     assert [a["id"] for a in c.anuncios] == ["fundo"]
+
+
+def test_colher_html_pula_bloco_profundo_demais_e_segue():
+    fundo = '{"a":' * 5000 + "1" + "}" * 5000
+    html = (
+        '<script type="application/json">' + fundo + "</script>"
+        '<script type="application/json">' + json.dumps({"x": _ad("ok")}) + "</script>"
+    )
+    c = Coletor()
+    c.colher_html(html)
+    assert [a["id"] for a in c.anuncios] == ["ok"]
+
+
+def test_colher_graphql_pula_pedaco_profundo_demais_e_segue():
+    fundo = '{"a":' * 5000 + "1" + "}" * 5000
+    c = Coletor()
+    c.colher_graphql(fundo + "\n" + json.dumps({"x": _ad("ok")}))
+    assert [a["id"] for a in c.anuncios] == ["ok"]
+
+
+def test_colher_tolera_midia_com_tipo_errado():
+    estranho = _ad("estranho")
+    estranho["snapshot"].update({"videos": 5, "images": "x", "cards": True})
+    c = Coletor()
+    c.colher({"a": estranho, "b": _ad("normal")})
+    por_id = {a["id"]: a for a in c.anuncios}
+    assert set(por_id) == {"estranho", "normal"}
+    assert por_id["estranho"]["videos"] == [] and por_id["estranho"]["imagens"] == []
+    assert por_id["estranho"]["midia"] == "nenhuma"
+
+
+def test_colher_pula_anuncio_que_quebra_a_normalizacao(monkeypatch):
+    import coleta
+    original = coleta._normalizar
+
+    def falha_no_ruim(obj, snap, aid):
+        if aid == "ruim":
+            raise RuntimeError("boom")
+        return original(obj, snap, aid)
+
+    monkeypatch.setattr(coleta, "_normalizar", falha_no_ruim)
+    c = Coletor()
+    c.colher([_ad("ruim"), _ad("bom")])
+    assert [a["id"] for a in c.anuncios] == ["bom"]
+    assert "ruim" not in c._vistos
+
+
+def test_colher_coage_campos_de_texto_pra_str():
+    ad = _ad("t")
+    ad["snapshot"].update({"page_name": {"x": 1}, "cta_text": ["a"], "link_url": 12, "title": {"y": 2}})
+    c = Coletor()
+    c.colher(ad)
+    a = c.anuncios[0]
+    assert a["pagina"] == "" and a["cta"] == "" and a["link"] == "12" and a["titulo"] == ""
