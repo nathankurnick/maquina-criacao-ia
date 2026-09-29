@@ -69,7 +69,7 @@ def test_empacotar_gera_zip_limpo_com_permissoes(tmp_path):
     z = zipfile.ZipFile(zip_arq)
     nomes = z.namelist()
     raiz = f"maquina-criacao-ia-{versao}/"
-    for obrigatorio in ("instalar.sh", "Instalar Máquina.command", "LEIA-ME.txt", "VERSION", "requirements.txt",
+    for obrigatorio in ("instalar.sh", "Instalar Máquina.command", "LEIA-ME.txt", "INSTALAR-COM-CLAUDE.md", "VERSION", "requirements.txt",
                         "bin/maquina", "nucleo/cli.py", "skills/05-funil/SKILL.md"):
         assert raiz + obrigatorio in nomes, obrigatorio
     for proibido in ("tests/", ".venv", "__pycache__", "/dev/", "docs-aluno/", "/log/", ".DS_Store",

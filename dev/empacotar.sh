@@ -23,7 +23,7 @@ falhar() { echo "❌ $1" >&2; exit 1; }
 rm -rf "$DIST/pacote" "$ZIP"
 mkdir -p "$PACOTE"
 
-for item in instalar.sh "Instalar Máquina.command" LEIA-ME.txt VERSION requirements.txt bin nucleo skills; do
+for item in instalar.sh "Instalar Máquina.command" LEIA-ME.txt INSTALAR-COM-CLAUDE.md VERSION requirements.txt bin nucleo skills; do
   [ -e "$RAIZ/$item" ] || falhar "Faltou $item no repositório."
   rsync -a --exclude __pycache__ --exclude .DS_Store --exclude .pytest_cache "$RAIZ/$item" "$PACOTE/"
 done
