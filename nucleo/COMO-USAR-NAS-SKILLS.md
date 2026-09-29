@@ -16,7 +16,9 @@ As skills chamam o núcleo sempre pelo comando `maquina` (via Bash), nunca impor
 
 Scripts Python próprios de uma skill rodam com `~/.maquina/venv/bin/python` e
 `PYTHONPATH=~/.maquina`, podendo importar `nucleo.kie`, `nucleo.netlify`,
-`nucleo.chaves.obter_chave` e `nucleo.projeto`.
+`nucleo.chaves.obter_chave`, `nucleo.projeto` e `nucleo.paletas`.
+
+Paletas: `from nucleo.paletas import PALETAS, paleta` (a do projeto é o campo `paleta` do oferta.md).
 
 Formato do `oferta.md`: frontmatter YAML com `nome, nicho, avatar, promessa, mecanismo,
 preco, entregaveis[], bonus[], garantia, link_checkout, paleta` + corpo livre.

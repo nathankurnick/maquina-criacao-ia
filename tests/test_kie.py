@@ -268,3 +268,15 @@ def test_aguardar_402_sem_creditos_e_permanente(monkeypatch):
     monkeypatch.setattr(kie, "_requisitar", lambda url, chave, dados=None: {"code": 402, "msg": "x"})
     with pytest.raises(kie.KieErroPermanente, match="créditos da KIE acabaram.*https://kie.ai"):
         kie.aguardar("k", "t1", intervalo=0, dormir=lambda s: None)
+
+
+def test_requisicao_manda_user_agent(monkeypatch):
+    vistos = []
+
+    def falso(req, timeout):
+        vistos.append(req.get_header("User-agent"))
+        return io.BytesIO(json.dumps({"code": 200, "data": 1}).encode())
+
+    monkeypatch.setattr(kie.urllib.request, "urlopen", falso)
+    kie.creditos("k")
+    assert vistos and vistos[0].startswith("Mozilla/5.0")

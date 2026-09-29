@@ -10,6 +10,7 @@ from pathlib import Path
 from nucleo.erros import MaquinaErro
 
 BASE = "https://api.kie.ai/api/v1"
+USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
 
 
 class KieErro(MaquinaErro):
@@ -21,7 +22,7 @@ class KieErroPermanente(KieErro):
 
 
 def _requisitar(url: str, chave: str, dados: "dict | None" = None) -> dict:
-    headers = {"Authorization": f"Bearer {chave}"}
+    headers = {"Authorization": f"Bearer {chave}", "User-Agent": USER_AGENT}
     corpo = None
     if dados is not None:
         corpo = json.dumps(dados).encode()
@@ -108,7 +109,7 @@ def aguardar(chave: str, task_id: str, intervalo: float = 15, limite: float = 18
 def baixar(url: str, destino: Path) -> Path:
     try:
         destino.parent.mkdir(parents=True, exist_ok=True)
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
         with urllib.request.urlopen(req, timeout=120) as r:
             destino.write_bytes(r.read())
     except (OSError, http.client.HTTPException) as e:  # inclui HTTPError, URLError, timeout, disco
