@@ -21,7 +21,9 @@ comando, nunca uma variável de shell.
 (`preco='R$ 97,00'`), porque `$` em aspas duplas some. Apóstrofo dentro do valor vira `'\''`.
 
 Scripts desta skill: `scripts/raspar.py` (Biblioteca de Anúncios), `scripts/ofertas.py`
-(agrupa e ranqueia), `scripts/capturar.py` (página de vendas). Referências:
+(agrupa e ranqueia), `scripts/capturar.py` (página de vendas), `scripts/baixar_criativos.py`
+(baixa imagem e vídeo dos anúncios da oferta escolhida) e `scripts/registrar_escolha.py`
+(anota a escolha). Referências:
 `referencias/dissecacao.md` e `referencias/modelagem.md`.
 
 ## Passo 1 — Projeto
@@ -80,6 +82,9 @@ PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/01-pesquisa-ofertas
 ```
 
 Se sair com código 1, mostre a mensagem do script ao aluno e pergunte como quer seguir.
+Se sair com **código 2**, nenhuma oferta tem página de vendas (só anúncios sem link ou de
+mensagem): mostre a mensagem do script e ofereça outro termo, o `--dominio` de um concorrente
+ou o modo manual. Não invente oferta.
 Mostre a tabela impressa (ela também fica em `<B>/ofertas.md`) e explique o termômetro em uma
 linha: **🔥 escalada** = muitos anúncios (coluna Volume) rodando há 30+ dias; **📈 validando**;
 **🌱 em teste**. Os números vêm do script — **nunca invente ou arredonde números**.
@@ -93,10 +98,31 @@ Peça pro aluno escolher uma oferta (pelo número). O número N da tabela é `of
 `<B>/ofertas.json` (mesma ordem da tabela). Se ele não souber, recomende a de maior termômetro
 que combine com o que ele consegue entregar, e diga por quê.
 
-## Passo 5 — Capturar a página da oferta escolhida
+## Passo 5 — Registrar a escolha, baixar os criativos e capturar a página
 
-Pegue o `link` de `ofertas[N-1]` em `<B>/ofertas.json` e crie a pasta da oferta
-`<P>/pesquisa/oferta-<chave-em-slug>` (ex.: chave `hotmart.com/abc` → `oferta-hotmart-com-abc`), `O`. Rode:
+Pegue o `link` de `ofertas[N-1]` em `<B>/ofertas.json` e crie a pasta da oferta `O` =
+`<P>/pesquisa/oferta-<chave-em-slug>`. **Regra do slug:** tudo minúsculo, sem acentos, e cada
+sequência de caracteres que não seja letra ou número vira um único `-` (sem `-` nas pontas).
+Exemplos: `hotmart.com/abc` → `oferta-hotmart-com-abc`; `whatsapp:Página Ágil` →
+`oferta-whatsapp-pagina-agil`.
+
+**Faça isto logo depois que o aluno escolher** — os links de vídeo e imagem do Facebook expiram
+em poucas horas. Primeiro registre a escolha:
+
+```bash
+PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/01-pesquisa-ofertas/scripts"; "$PY" "$S/registrar_escolha.py" --busca "<B>" --oferta N --pasta-oferta "<O>"
+```
+
+(grava `<P>/pesquisa/escolhida.json` com busca, oferta, chave, pasta_oferta e data; o Sistema 04 lê
+esse arquivo). Depois baixe os criativos (as 10 primeiras cópias da oferta; para o Sistema 04):
+
+```bash
+PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/01-pesquisa-ofertas/scripts"; "$PY" "$S/baixar_criativos.py" --anuncios "<B>/anuncios.json" --ofertas "<B>/ofertas.json" --oferta N --saida "<O>/anuncios"
+```
+
+Isso cria `<O>/anuncios/` com os arquivos e o `criativos.json` (id, pagina, texto, cta, link,
+arquivos e o link da Biblioteca de cada anúncio). Se sair 1, mostre a mensagem e siga assim
+mesmo; se avisar que nenhum arquivo baixou, siga só com os textos. Em seguida capture a página:
 
 ```bash
 PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/01-pesquisa-ofertas/scripts"; "$PY" "$S/capturar.py" --url "<link>" --saida "<O>"
@@ -106,6 +132,16 @@ Se sair com 130 ou 1, mostre a mensagem do script e pergunte ao aluno como segui
 A captura gera em `<O>`: `dobra.png` (primeira tela no celular), `pagina-01.png`, `pagina-02.png`…
 (a página em fatias), `pagina.txt` (texto) e `dados.json` (url, url_final, titulo, precos,
 links_checkout, garantia, altura, altura_capturada, largura, truncada, prints).
+
+**Checkout / order bump:** se `links_checkout` em `dados.json` não estiver vazio, capture também
+o primeiro link de checkout, em `<O>/checkout`:
+
+```bash
+PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/01-pesquisa-ofertas/scripts"; "$PY" "$S/capturar.py" --url "<primeiro link_checkout>" --saida "<O>/checkout"
+```
+
+Se falhar, siga sem ele (é só um extra). No Passo 6 use o `pagina.txt`, os `precos` e as fatias
+desse checkout para achar **order bump** e **preço real**; o que não aparecer, "não encontrado".
 
 Leia `pagina.txt` e `dados.json` e olhe `dobra.png` e as fatias listadas em `prints`.
 - Se `truncada` for verdadeiro, a página era longa demais e só o começo foi capturado: se o
@@ -118,10 +154,12 @@ Leia `pagina.txt` e `dados.json` e olhe `dobra.png` e as fatias listadas em `pri
 
 ## Passo 6 — Dissecar
 
-Siga `referencias/dissecacao.md` e escreva `<O>/dissecacao.md`. Use também os `textos` da
-oferta em `ofertas.json` (já são as cópias mais repetidas) e, se quiser mais, os anúncios do mesmo
-anunciante em `anuncios.json` (campo `pagina`) pra listar os **ângulos de hook** — o Sistema 04
-vai usar esse arquivo. Sem `ofertas.json` (veio de link de página de vendas), tire os ângulos da
+Siga `referencias/dissecacao.md` e escreva `<O>/dissecacao.md` (com as linhas `Busca:` e `Chave:`
+da ficha). Use também os `textos` da oferta em `ofertas.json` (já são as cópias mais repetidas) e
+o `<O>/anuncios/criativos.json` pra listar os **ângulos de hook**: cada ângulo leva o **id de um
+anúncio de exemplo** (dos `ids` da oferta) e a **primeira linha literal** do texto desse anúncio.
+Isso é só **REFERÊNCIA** para o Sistema 04 — não vai para a copy do aluno e ninguém deve copiar
+essas frases. O Sistema 04 vai usar esse arquivo. Sem `ofertas.json` (veio de link de página de vendas), tire os ângulos da
 própria página ou de textos de anúncio que o aluno colar.
 Mostre ao aluno um resumo curto (promessa, mecanismo, preço, bônus, garantia, bump, 3 ângulos).
 

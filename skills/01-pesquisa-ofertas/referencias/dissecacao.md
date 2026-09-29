@@ -4,6 +4,8 @@ Preencha `dissecacao.md` na pasta da oferta com as seções abaixo. Use SÓ o qu
 e nos anúncios; o que não aparecer, escreva "não encontrado" (não deduza preço nem bônus).
 
 ## Ficha
+- **Busca:** (pasta da busca, ex.: pesquisa/2026-09-28-receitas-fit)
+- **Chave:** (a chave da oferta em ofertas.json)
 - **Link:** 
 - **Anunciante(s):** 
 - **Termômetro:** (copie de ofertas.json: selo, pontuação, volume de anúncios, dias no ar)
@@ -32,8 +34,13 @@ Que tipo de prova a página mostra (depoimentos, prints, números, autoridade). 
 tipo — não copie depoimentos.
 
 ## Ângulos de hook dos anúncios
-3 a 6 ângulos, cada um com: nome do ângulo, a ideia em uma frase, e o formato (vídeo/imagem).
+3 a 6 ângulos, cada um com: nome do ângulo, a ideia em uma frase, o formato (vídeo/imagem), o
+**id de um anúncio de exemplo** (um dos `ids` da oferta, presente em `anuncios/criativos.json`) e a
+**primeira linha literal** do texto desse anúncio (entre aspas, sem alterar).
 Baseie-se nos textos repetidos em ofertas.json (o texto mais repetido é o mais validado).
+Atenção: o id e a linha literal são **REFERÊNCIA para o Sistema 04** (para ele ver o criativo
+original na Biblioteca de Anúncios). **Não copie essas frases para a copy do aluno** — ele cria
+as próprias palavras a partir do ângulo.
 
 ## O que faz essa oferta vender
 3 bullets: a estrutura que vale modelar (não as palavras).

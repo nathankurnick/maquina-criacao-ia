@@ -26,7 +26,7 @@ def test_skill_md_referencia_arquivos_que_existem():
     texto = (SKILL / "SKILL.md").read_text(encoding="utf-8")
     for rel in re.findall(r"`((?:scripts|referencias)/[\w.-]+)`", texto):
         assert (SKILL / rel).exists(), rel
-    for script in ("raspar.py", "ofertas.py", "capturar.py"):
+    for script in ("raspar.py", "ofertas.py", "capturar.py", "baixar_criativos.py", "registrar_escolha.py"):
         assert f"scripts/{script}" in texto
 
 
@@ -77,3 +77,20 @@ def test_skill_md_comandos_inline_autocontidos():
             m = re.search(r'"\$%s\b' % var, cmd)
             if m:
                 assert re.search(r'(^|[\s;])%s=' % var, cmd[:m.start()]), cmd
+
+
+def test_skill_cobre_escolha_criativos_checkout_e_saida_2():
+    texto = (SKILL / "SKILL.md").read_text(encoding="utf-8")
+    for trecho in ("escolhida.json", "criativos.json", "links_checkout", "<O>/checkout",
+                   "código 2", "oferta-whatsapp-pagina-agil", "REFERÊNCIA"):
+        assert trecho in texto, trecho
+    dissecacao = (SKILL / "referencias" / "dissecacao.md").read_text(encoding="utf-8")
+    assert "**Busca:**" in dissecacao and "**Chave:**" in dissecacao and "REFERÊNCIA" in dissecacao
+
+
+def test_nomes_de_modulo_dos_scripts_sao_unicos_entre_skills():
+    nomes = [p.name for p in (RAIZ / "skills").glob("*/scripts/*.py")]
+    assert len(nomes) == len(set(nomes))
+    doc = (RAIZ / "nucleo" / "COMO-USAR-NAS-SKILLS.md").read_text(encoding="utf-8")
+    for n in ("coleta", "raspar", "ofertas", "capturar", "baixar_criativos", "registrar_escolha"):
+        assert f"`{n}`" in doc

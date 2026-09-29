@@ -39,3 +39,9 @@ preco, entregaveis[], bonus[], garantia, link_checkout, paleta` + corpo livre.
 - Item que começa com "-" precisa vir depois de `--`, ex.: `maquina oferta adicionar p bonus -- "-50% no combo"`.
 - A publicação na Netlify envia só arquivos web (html, css, js, imagens, fontes, vídeos, pdf);
   `conteudo.json` e arquivos ocultos nunca vão.
+- **Scripts de skill têm nomes de módulo únicos entre todas as skills** (o `pytest.ini` põe as pastas
+  `scripts/` no mesmo namespace de import). Nomes já usados pela skill 01: `coleta`, `raspar`,
+  `ofertas`, `capturar`, `baixar_criativos`, `registrar_escolha`. Skill nova: prefixe ou escolha nomes
+  diferentes destes e, se criar outra pasta `scripts/`, adicione-a ao `pythonpath` do `pytest.ini`.
+- Detalhe técnico de erro (traceback) vai para `${MAQUINA_HOME:-~/.maquina}/log/maquina.log`; o
+  aluno só vê a mensagem amigável.
