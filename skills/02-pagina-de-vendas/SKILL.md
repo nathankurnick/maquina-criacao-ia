@@ -36,7 +36,9 @@ M="$(command -v maquina || echo "$HOME/.local/bin/maquina")"; "$M" oferta defini
 
 Confirme também o **link de checkout** (Kiwify, Hotmart, Payt…), que precisa começar com
 `https://`. Sem ele (ou com link inválido), o plano fica desligado: dá pra montar e ver a
-prévia, mas não publicar. Grave com `link_checkout='https://...'`.
+prévia, mas não publicar. Grave com `link_checkout='https://...'`. Se o link mudar depois,
+atualize os dois lugares — `maquina oferta definir <slug> link_checkout='…'` e
+`planos.basico.checkoutUrl` no `conteudo.json` — e publique de novo (Passo 6).
 
 Se existir `<P>/pesquisa/escolhida.json`, leia o `pasta_oferta` dele e o `dissecacao.md` dessa
 pasta: use a estrutura que vende, nunca as frases do concorrente.
@@ -72,9 +74,15 @@ PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/02-pagina-de-vendas
 PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/02-pagina-de-vendas/scripts"; "$PY" "$S/pagina_config.py" --projeto "<P>" --definir 'paleta=preto-dourado'
 ```
 
+Grave a paleta também na oferta (fonte única de verdade):
+
+```bash
+M="$(command -v maquina || echo "$HOME/.local/bin/maquina")"; "$M" oferta definir <slug> paleta='<escolhida>'
+```
+
 Pixels são opcionais: `--definir 'pixel_meta=<só números>'`, `--definir 'pixel_google=G-XXXX'`.
-Código extra no `<head>` (Utmify etc.): salve o trecho que o aluno colar num arquivo e use
-`--head-arquivo "<arquivo>"`. SEO: `--definir 'seo_titulo=...'` e `--definir 'seo_descricao=...'`.
+Código extra no `<head>` (Utmify etc.): salve o trecho que o aluno colar em `<P>/pagina/head.html`
+(fora da pasta `site/`, que é recriada a cada montagem) e use `--head-arquivo "<P>/pagina/head.html"`. SEO: `--definir 'seo_titulo=...'` e `--definir 'seo_descricao=...'`.
 Saída 1 = valor inválido (a mensagem diz o certo); nada é gravado. Saída 130 = cancelado.
 
 ## Passo 5 — Montar e ver a prévia
@@ -103,22 +111,43 @@ Olhe `<P>/pagina/previa/dobra.png` (primeira tela) e as fatias `pagina-NN.png` (
 
 ## Passo 6 — Publicar
 
+Publicar sempre remonta a página antes (o que vai ao ar é o `conteudo.json` e o `config.json`
+de agora). Então qualquer edição, de copy ou de configuração, se publica só rodando este passo
+de novo.
+
 ```bash
 PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/02-pagina-de-vendas/scripts"; "$PY" "$S/pagina_publicar.py" --projeto "<P>"
 ```
 
-- Saída 0 ("✅ No ar: <url>"): mostre o link. Se vier o aviso "⚠️ Não consegui salvar o endereço…",
-  mostre também o link e o `site_id` e peça pro aluno anotar.  Mudanças depois: ajuste, monte (Passo 5) e publique de novo —
-  o link continua o mesmo.
-- Saída 3 (sem chave da Netlify): o script mostra o passo a passo do Netlify Drop
-  (https://app.netlify.com/drop, arrastar a pasta `site`). Acompanhe o aluno e ofereça configurar a
-  chave com `maquina chaves` pra próxima vez.
-- Saída 1: mostre a mensagem (falta checkout, página não montada, chave recusada…) e resolva. Se
+- Saída 0 ("✅ No ar: <url>"): mostre o link e os ⚠️ avisos de montagem. Se vier o aviso
+  "⚠️ Não consegui salvar o endereço…", mostre também o link e o `site_id` e peça pro aluno
+  anotar. Se vier "⚠️ O endereço da página mudou", avise que os links dos anúncios precisam ser
+  atualizados. Mudanças depois: ajuste e rode este passo de novo — o link continua o mesmo.
+- Saída 3 (sem chave da Netlify): o script mostra o passo a passo do Netlify Drop. Abra a pasta
+  pro aluno achar e acompanhe cada passo (entrar ou criar a conta grátis ANTES de arrastar: sem
+  login a página é apagada em cerca de 1 hora):
+
+  ```bash
+  open "<P>/pagina"
+  ```
+
+  Quando o aluno mandar o link, grave-o:
+
+  ```bash
+  PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/02-pagina-de-vendas/scripts"; "$PY" "$S/pagina_config.py" --projeto "<P>" --definir 'url=https://...'
+  ```
+
+  Avise: se depois ele passar a publicar com a chave, a página ganha um endereço NOVO e os
+  anúncios precisam ser atualizados. Se ele vai continuar editando a página, recomende
+  configurar a chave agora com `maquina chaves`.
+- Saída 1: mostre a mensagem (falta checkout, falha ao montar, chave recusada…) e resolva. Se
   disser "A Máquina não está instalada direito", peça pra rodar o `instalar.sh` de novo.
 - Saída 130: o aluno cancelou; nada foi publicado.
 
 ## Regerar
 
 Se o aluno atualizou a Máquina ou pediu "regerar a página", só rode os Passos 5 e 6 (sem
-reescrever a copy): o
-`conteudo.json` guarda a copy e o template novo é aplicado.
+reescrever a copy): o `conteudo.json` guarda a copy e o template novo é aplicado.
+
+Outras páginas do mesmo projeto (ex.: upsell em `<P>/funil/upsell`) usam os mesmos scripts com
+`--pagina "<pasta>"` depois do `--projeto`.

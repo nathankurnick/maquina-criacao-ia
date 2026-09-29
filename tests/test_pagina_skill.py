@@ -51,3 +51,12 @@ def test_exemplo_da_referencia_e_um_conteudo_valido():
     conteudo, avisos = pc.normalizar(json.loads(bloco))
     assert conteudo["hero"]["ativo"] and conteudo["planos"]["ativo"]
     assert not [a for a in avisos if not a.startswith(("depoimentos", "carrossel"))]
+
+
+def test_skill_cobre_endereco_paleta_e_head():
+    t = _texto()
+    assert "--definir 'url=" in t and "endereço NOVO" in t and "maquina chaves" in t
+    assert "oferta definir <slug> paleta='<escolhida>'" in t
+    assert "<P>/pagina/head.html" in t and 'open "<P>/pagina"' in t
+    assert "remonta a página antes" in t and "link_checkout" in t and "planos.basico.checkoutUrl" in t
+    assert "  " not in re.search(r"## Passo 6.*?## Regerar", t, re.S).group(0).replace("\n  ", "\n").replace("    ", "")
