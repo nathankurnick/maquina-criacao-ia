@@ -8,6 +8,7 @@ import argparse
 import html
 import json
 import os
+import re
 import shutil
 import sys
 import traceback
@@ -79,6 +80,8 @@ def _documento(meta: dict, markdown: str, capa_img: str) -> str:
                 f'<h1 class="capa-titulo">{e(meta["titulo"])}</h1>{sub}{autor}</section>')
     itens = "".join(f'<li class="n{t["nivel"]}"><a href="#{t["id"]}">{e(t["texto"])}</a></li>' for t in titulos)
     sumario = f'<section class="sumario"><h2>Sumário</h2><ol>{itens}</ol></section>' if titulos else ""
+    partes = re.split(r"(?=<h1[ >])", corpo)
+    corpo = partes[0] + "".join(f'<section class="capitulo">{c}</section>' for c in partes[1:])
     return f"{capa}{sumario}<main>{corpo}</main>"
 
 
@@ -133,17 +136,28 @@ def gerar(pasta: Path, paleta_nome: str, carrossel: "Path | None" = None) -> dic
                     opcoes.update(display_header_footer=True, header_template="<span></span>",
                                   footer_template=RODAPE)
                 pg.pdf(**opcoes)
-                if meta["tipo"] != "slides":  # a captura não aplica as margens do @page: simula-as
-                    pg.add_style_tag(content=".sumario,main{padding:18mm 16mm 0}main{padding-top:0}"
-                                             "h1{break-before:auto}")
-                altura = pg.evaluate("document.documentElement.scrollHeight")
-                largura, alto = (1280, 720) if meta["tipo"] == "slides" else (A4_W, A4_H)
-                for k in (1, 2):
-                    if altura >= alto * (k + 1):
-                        destino = previa / f"amostra-{k}.png"
-                        pg.screenshot(path=str(destino), full_page=True, clip={"x": 0, "y": alto * k, "width": largura,
-                                                               "height": alto})
-                        amostras.append(destino)
+                slides = meta["tipo"] == "slides"
+                pg.emulate_media(media="screen")
+                if not slides:  # cada bloco vira uma "página" A4 com as margens do @page
+                    pg.add_style_tag(content=(
+                        ".sumario,.capitulo{width:794px;min-height:1123px;padding:18mm 16mm 20mm;"
+                        "background:#fff;break-before:auto;break-after:auto}.capitulo h1{break-before:auto}"
+                        "main{display:block}"))
+                if slides:
+                    alvos = pg.query_selector_all(".slide")[1:3]
+                    largura, alto = 1280, 720
+                else:
+                    sumario = pg.query_selector_all(".sumario")
+                    caps = pg.query_selector_all(".capitulo")
+                    alvos = ((sumario + caps)[:2] if sumario else caps[:2])
+                    largura, alto = A4_W, A4_H
+                for k, el in enumerate(alvos, 1):
+                    caixa = el.bounding_box()  # relativo ao viewport; soma o scroll pra clip da página inteira
+                    y = caixa["y"] + pg.evaluate("window.scrollY")
+                    destino = previa / f"amostra-{k}.png"
+                    pg.screenshot(path=str(destino), full_page=True,
+                                  clip={"x": 0, "y": y, "width": largura, "height": alto})
+                    amostras.append(destino)
             finally:
                 try:
                     nav.close()

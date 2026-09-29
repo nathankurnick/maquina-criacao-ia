@@ -104,3 +104,44 @@ def test_main_ctrl_c(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(ep, "gerar", cancela)
     assert ep.main(["--pasta", str(p)]) == 130
     assert "Cancelado" in capsys.readouterr().err
+
+
+def _tamanho_png(arq):
+    d = arq.read_bytes()
+    return int.from_bytes(d[16:20], "big"), int.from_bytes(d[20:24], "big")
+
+
+def test_montar_html_envolve_cada_capitulo():
+    html = ep.montar_html({"titulo": "T", "subtitulo": "", "autor": "", "tipo": "ebook"}, "# A\n\ntexto\n\n## sub\n\n# B\n\nfim", "azul-laranja")
+    assert html.count('<section class="capitulo">') == 2 and html.count("</section>") >= 4
+    assert html.index('<section class="capitulo"><h1') < html.index('id="sub"') < html.rindex('<section class="capitulo">')
+
+
+def _gerar_ou_pular(p, tipo_paleta="azul-laranja"):
+    pytest.importorskip("playwright")
+    try:
+        return ep.gerar(p, tipo_paleta)
+    except Exception as e:
+        if "Executable doesn't exist" in str(e):
+            pytest.skip("Chromium do Playwright não instalado")
+        raise
+
+
+def test_amostras_sao_paginas_a4_e_a_primeira_e_o_sumario(tmp_path):
+    p = _pasta(tmp_path)  # 2 capítulos curtos
+    r = _gerar_ou_pular(p)
+    assert [_tamanho_png(a) for a in r["amostras"]] == [(794, 1123), (794, 1123)]
+    assert r["amostras"][0].read_bytes() != r["amostras"][1].read_bytes()
+
+
+def test_ebook_de_um_capitulo_da_sumario_e_capitulo(tmp_path):
+    p = _pasta(tmp_path, md="# Único\n\nPouco texto.")
+    r = _gerar_ou_pular(p)
+    assert len(r["amostras"]) == 2
+    assert [_tamanho_png(a) for a in r["amostras"]] == [(794, 1123), (794, 1123)]
+
+
+def test_slides_amostras_sao_os_slides_2_e_3(tmp_path):
+    p = _pasta(tmp_path, tipo="slides", md="## A\n\n- x\n---\n## B\n\n- y")
+    r = _gerar_ou_pular(p, "grafite-ciano")
+    assert [_tamanho_png(a) for a in r["amostras"]] == [(1280, 720), (1280, 720)]
