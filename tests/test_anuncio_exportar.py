@@ -125,7 +125,7 @@ def test_apaga_plano_do_outro_formato(tmp_path, monkeypatch):
     p = _projeto(tmp_path)
     (p / "anuncios" / "plano-de-teste.xlsx").write_bytes(b"x")
     monkeypatch.setattr(ae, "gerar_xlsx", None)
-    ae.exportar(p)
+    ae.exportar(p, refazer_plano=True)
     assert not (p / "anuncios" / "plano-de-teste.xlsx").exists()
     assert (p / "anuncios" / "plano-de-teste.csv").exists()
 
@@ -164,3 +164,42 @@ def test_csv_ponto_e_virgula_e_guarda_de_formula(tmp_path, monkeypatch):
     linhas = list(csv.reader(r["plano"].open(encoding="utf-8-sig"), delimiter=";"))
     assert linhas[0][0] == "Anúncio" and len(linhas[0]) == 8
     assert ae._seguro("\tx").startswith(" ") and ae._seguro("\rx").startswith(" ")
+
+
+def test_plano_existente_e_mantido(tmp_path, monkeypatch, capsys):
+    p = _projeto(tmp_path)
+    monkeypatch.setattr(ae, "gerar_xlsx", None)
+    plano = p / "anuncios" / "plano-de-teste.csv"
+    plano.write_text("meu resultado", encoding="utf-8")
+    r = ae.exportar(p)
+    assert plano.read_text(encoding="utf-8") == "meu resultado" and r["plano"] == plano and r["mantido"]
+    assert not (p / "anuncios" / "plano-de-teste.anterior.csv").exists()
+    assert (p / "anuncios" / "textos.md").exists()
+    ae.main(["--projeto", str(p)])
+    assert "Mantive seu plano-de-teste" in capsys.readouterr().out
+
+
+def test_refazer_plano_guarda_o_anterior(tmp_path, monkeypatch):
+    p = _projeto(tmp_path)
+    monkeypatch.setattr(ae, "gerar_xlsx", None)
+    a = p / "anuncios"
+    (a / "plano-de-teste.csv").write_text("meu resultado", encoding="utf-8")
+    (a / "plano-de-teste.anterior.csv").write_text("mais velho", encoding="utf-8")
+    r = ae.exportar(p, refazer_plano=True)
+    assert (a / "plano-de-teste.anterior.csv").read_text(encoding="utf-8") == "meu resultado"
+    assert "Anúncio" in r["plano"].read_text(encoding="utf-8-sig") and not r["mantido"]
+    assert ae.main(["--projeto", str(p), "--refazer-plano"]) == 0
+
+
+def test_cerca_maior_que_crases_do_texto(tmp_path):
+    a = dict(ANUNCIOS[0], texto_principal="use ```codigo``` aqui")
+    md = ae.textos_md([a], "", tmp_path)
+    assert "````text\nuse ```codigo``` aqui\n````" in md
+
+
+def test_orfaos_ignora_arquivos_ocultos(tmp_path):
+    p = _projeto(tmp_path)
+    c = p / "anuncios" / "criativos"
+    c.mkdir()
+    (c / ".velho-1x1.jpg").write_bytes(b"x")
+    assert ae.exportar(p)["orfaos"] == []

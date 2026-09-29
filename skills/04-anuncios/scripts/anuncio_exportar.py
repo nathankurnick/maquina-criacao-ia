@@ -7,6 +7,7 @@ import argparse
 import csv
 import io
 import os
+import re
 import sys
 import traceback
 from datetime import datetime
@@ -56,6 +57,11 @@ def _link(link: str) -> str:
     return link or "⚠️ Publique a página no Sistema 02 e cole o link aqui"
 
 
+def _cerca(texto: str) -> str:
+    maior = max((len(m) for m in re.findall(r"`+", texto)), default=0)
+    return "`" * max(3, maior + 1)
+
+
 def textos_md(anuncios: list[dict], link: str, pasta_criativos: Path) -> str:
     partes = ["# Textos dos anúncios estáticos\n",
               "Pra cada anúncio: suba as imagens, cole o texto principal, o título, a descrição, escolha o botão e o link.\n"]
@@ -64,10 +70,11 @@ def textos_md(anuncios: list[dict], link: str, pasta_criativos: Path) -> str:
             continue
         arquivos = [f"{a['id']}-{fmt}.jpg" for fmt in ("1x1", "9x16")
                     if (Path(pasta_criativos) / f"{a['id']}-{fmt}.jpg").exists()]
+        cerca = _cerca(a["texto_principal"])
         partes.append(
             f"\n## {a['id']} — {a['angulo']}\n\n"
             f"- **Imagens:** {', '.join(arquivos) if arquivos else 'imagens ainda não montadas'}\n"
-            f"- **Texto principal:**\n\n```text\n{a['texto_principal']}\n```\n\n"
+            f"- **Texto principal:**\n\n{cerca}text\n{a['texto_principal']}\n{cerca}\n\n"
             f"- **Título:** {a['titulo']}\n"
             f"- **Descrição:** {a['descricao'] or '—'}\n"
             f"- **Botão:** {a['cta']}\n"
@@ -114,7 +121,7 @@ def _gravar(destino_arq: Path, texto: str) -> Path:
     return destino_arq
 
 
-def exportar(pasta_projeto: Path) -> dict:
+def exportar(pasta_projeto: Path, refazer_plano: bool = False) -> dict:
     pasta_projeto = Path(pasta_projeto).resolve()
     pasta = pasta_projeto / "anuncios"
     anuncios = ler_anuncios(pasta)
@@ -125,19 +132,25 @@ def exportar(pasta_projeto: Path) -> dict:
         r["roteiros"] = _gravar(pasta / "roteiros.md", roteiros)
     else:
         (pasta / "roteiros.md").unlink(missing_ok=True)
-    linhas = linhas_plano(anuncios)
-    if gerar_xlsx is not None:
-        r["plano"] = gerar_xlsx([{"nome": "Plano de teste", "colunas": COLUNAS, "linhas": linhas,
-                                  "larguras": [18, 28, 10, 40, 22, 18, 12, 30]}], pasta / "plano-de-teste.xlsx")
+    existentes = [pasta / n for n in ("plano-de-teste.xlsx", "plano-de-teste.csv") if (pasta / n).exists()]
+    r["mantido"] = bool(existentes) and not refazer_plano
+    if r["mantido"]:
+        r["plano"] = existentes[0]
     else:
-        buf = io.StringIO()
-        csv.writer(buf, delimiter=";").writerows([COLUNAS] + linhas)
-        r["plano"] = _gravar(pasta / "plano-de-teste.csv", "﻿" + buf.getvalue())
-    (pasta / ("plano-de-teste.csv" if r["plano"].suffix == ".xlsx" else "plano-de-teste.xlsx")).unlink(missing_ok=True)
+        for antigo in existentes:  # o aluno preenche Status/Resultado: nunca perder
+            os.replace(antigo, antigo.with_name(f"plano-de-teste.anterior{antigo.suffix}"))
+        linhas = linhas_plano(anuncios)
+        if gerar_xlsx is not None:
+            r["plano"] = gerar_xlsx([{"nome": "Plano de teste", "colunas": COLUNAS, "linhas": linhas,
+                                      "larguras": [18, 28, 10, 40, 22, 18, 12, 30]}], pasta / "plano-de-teste.xlsx")
+        else:
+            buf = io.StringIO()
+            csv.writer(buf, delimiter=";").writerows([COLUNAS] + linhas)
+            r["plano"] = _gravar(pasta / "plano-de-teste.csv", "\ufeff" + buf.getvalue())
     ids = {a["id"] for a in anuncios}
     criativos = pasta / "criativos"
     r["orfaos"] = sorted(f for f in criativos.glob("*.jpg")
-                         if f.stem.rsplit("-", 1)[0] not in ids) if criativos.is_dir() else []
+                         if not f.name.startswith(".") and f.stem.rsplit("-", 1)[0] not in ids) if criativos.is_dir() else []
     r["link"] = link
     return r
 
@@ -145,12 +158,13 @@ def exportar(pasta_projeto: Path) -> dict:
 def main(argv: "list[str] | None" = None) -> int:
     ap = _Parser(description="Exporta textos, roteiros e plano de teste dos anúncios.")
     ap.add_argument("--projeto", required=True)
+    ap.add_argument("--refazer-plano", action="store_true")
     try:
         args = ap.parse_args(argv)
     except SystemExit as s:
         return int(s.code or 0)
     try:
-        r = exportar(Path(args.projeto))
+        r = exportar(Path(args.projeto), args.refazer_plano)
     except KeyboardInterrupt:
         print("Cancelado.", file=sys.stderr)
         return 130
@@ -168,7 +182,11 @@ def main(argv: "list[str] | None" = None) -> int:
     print(f"✅ Textos: {r['textos']}")
     if r["roteiros"]:
         print(f"✅ Roteiros: {r['roteiros']}")
-    print(f"✅ Plano de teste: {r['plano']}")
+    if r["mantido"]:
+        print("ℹ️ Mantive seu plano-de-teste (pra gerar de novo: --refazer-plano; "
+              "o atual vira plano-de-teste.anterior.<ext>)")
+    else:
+        print(f"✅ Plano de teste: {r['plano']}")
     for o in r["orfaos"]:
         print(f"⚠️ {o.name} é de um anúncio que não está mais no anuncios.json (não apaguei; apague se não usar).")
     if not r["link"]:

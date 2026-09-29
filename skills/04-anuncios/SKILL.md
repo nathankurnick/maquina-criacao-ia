@@ -143,6 +143,9 @@ Entregue ao aluno:
 - `<P>/anuncios/plano-de-teste.xlsx` — uma linha por criativo/hook pra acompanhar o teste (se não
   der pra gerar o .xlsx, sai um `plano-de-teste.csv`).
 
+O plano de teste é do aluno (ele preenche Status/Resultado): se `plano-de-teste.xlsx`/`.csv` já
+existir, o exportar MANTÉM o arquivo e avisa "Mantive seu plano-de-teste". Só se o aluno pedir um
+plano novo, rode o exportar com `--refazer-plano` (o atual vira `plano-de-teste.anterior.<ext>`).
 Se o aluno mudar qualquer texto de anúncio depois de exportar, rode o exportar de novo (os
 arquivos são refeitos). Linhas ⚠️ sobre imagens de anúncios que saíram do `anuncios.json` são só
 aviso: nada é apagado, o aluno decide.
