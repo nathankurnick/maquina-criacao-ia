@@ -27,5 +27,8 @@ que falar, exemplo, fechamento com tarefa. Escreva como a pessoa fala.
 **slides** — Um slide por ideia; título curto + no máximo 4 tópicos. Separe slides com `---`.
 
 **planilha** — Uma aba por finalidade; colunas com nome claro; exemplo preenchido nas
-primeiras linhas; fórmulas começando com `=` (ex.: `=SUM(C2:C31)`), recalculadas quando a
-planilha é aberta.
+primeiras linhas; fórmulas começando com `=`, recalculadas quando a planilha é aberta.
+Fórmulas sempre em **inglês e com vírgula**: `=SUM(C2:C31)`, `=IF(A2>0,1,0)` (o script recusa
+`SOMA`, `SE`, `PROCV`, `MÉDIA`, `CONT.SE`, `SOMASE` e `;`, e diz o nome certo). Números entram como
+números do JSON. Por aba, `"formatos"` opcional, um por coluna: `"texto"`, `"numero"`, `"moeda"`
+(R$ 1.234,50), `"percentual"` (0,25 vira 25%) ou `"data"` (aceita `"2026-10-01"`).

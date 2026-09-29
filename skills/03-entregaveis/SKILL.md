@@ -31,8 +31,11 @@ Se houver mais de um, pergunte qual. Depois:
 M="$(command -v maquina || echo "$HOME/.local/bin/maquina")"; "$M" projeto caminho <slug>; "$M" oferta mostrar <slug>
 ```
 
-O `maquina oferta mostrar` imprime o oferta.md (só se altera via `maquina oferta definir|adicionar`). Anote o caminho como `<P>`, a `paleta` (se vazia, use `azul-laranja` e diga ao aluno que dá pra
-escolher outra no Sistema 02) e as listas `entregaveis` e `bonus`. Se existir
+O `maquina oferta mostrar` imprime JSON com os dados da oferta (só se altera via
+`maquina oferta definir|adicionar`). Anote o caminho como `<P>`, as listas `entregaveis` e `bonus`
+e a paleta, nesta ordem: se existir `<P>/pagina/config.json`, leia-o e use a `paleta` dele (é a
+que está na página de vendas); senão a `paleta` da oferta; se ambas estiverem vazias, use
+`azul-laranja` e diga ao aluno que dá pra escolher outra no Sistema 02. Se existir
 `<P>/pesquisa/dissecacao.md`, leia: ajuda a acertar o que o público espera do material.
 
 ## Passo 2 — Mapa de entregáveis
@@ -45,21 +48,34 @@ Se ele quiser um item que não está no oferta.md, grave antes com `maquina ofer
 M="$(command -v maquina || echo "$HOME/.local/bin/maquina")"; "$M" oferta adicionar <slug> bonus 'Checklist de compras'
 ```
 
+Se o texto do item começa com "-", coloque `--` antes dele para não ser lido como opção.
+
 ## Passo 3 — Escrever cada entregável
 
 Pra cada item aprovado, crie a pasta `<P>/entregaveis/<slug-do-item>/` (ex.: `ebook-pao-caseiro`;
-o nome da pasta vira o nome do arquivo final) com:
+o nome da pasta vira o nome do arquivo final e das imagens do carrossel: só minúsculas, sem acento,
+com hífens, sem espaços) com:
 
 - `meta.json`: `{"titulo": "...", "subtitulo": "...", "tipo": "ebook", "autor": "<nome do aluno>"}`
   (`tipo`: ebook, guia, checklist, roteiro, slides ou planilha; só `titulo` é obrigatório).
 - `conteudo.md`: o texto completo, seguindo `referencias/escrita.md`.
 - Planilha: em vez de `conteudo.md`, um `planilha.json` com
   `{"abas": [{"nome": "...", "colunas": [...], "linhas": [[...]], "larguras": [...]}]}`
-  (`larguras` é opcional; texto começando com `=` vira fórmula).
+  (`larguras` é opcional; texto começando com `=` vira fórmula). Fórmulas sempre em **inglês e
+  com vírgula**: `=SUM(C2:C31)`, `=IF(A2>0,1,0)` (nunca `SOMA`, `SE` nem `;`: o script recusa e
+  explica). Números vão como números do JSON (`420`, não `"420"`). Opcional por aba:
+  `"formatos": ["texto", "numero", "moeda", "percentual", "data"]`, um por coluna na ordem de
+  `colunas` (moeda sai como R$; data aceita `"2026-10-01"`).
+- Imagens dentro do conteúdo: arquivos em `imagens/` com nome em minúsculas, sem acento, com
+  hífens, de até ~1600 px de largura.
+- Roteiro e slides são material **interno** do curso: roteiro não tem capa,
+  não vai pro carrossel e só sobe na área de membros se o aluno quiser vendê-lo como apostila;
+  slides: um deck por aula, sem carrossel por padrão.
 
 Material grande: escreva capítulo por capítulo, mostrando cada um ao aluno; ele aprova antes de
-você gerar. Nunca invente prova (depoimento, número de alunos, resultado de cliente) nem estudo,
-estatística ou citação: marque "(confirme esta informação)" e pergunte.
+você gerar. Nunca invente prova nem estudo. Faltou prova (depoimento, número de alunos, resultado de
+cliente): escreva "[cole aqui um depoimento real]" (ou o item que faltar) e pergunte ao aluno.
+Faltou estudo, estatística ou citação: marque "(confirme esta informação)" e pergunte.
 
 ## Passo 4 — Capa e mockup (ebook, guia, checklist, roteiro)
 
@@ -80,19 +96,29 @@ PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/03-entregaveis/scri
 - Falha da KIE nunca impede a capa: o aviso diz se "repetir não adianta" (ajuste o prompt) ou se
   vale "tentar de novo mais tarde".
 - Saídas: `<E>/capa.png` (1240x1754) e `<E>/mockup.png` (fundo transparente). Olhe as duas
-  imagens e mostre ao aluno; refaça se ele pedir. Slides e planilhas não têm capa.
+  imagens e mostre ao aluno; refaça se ele pedir. O `mockup.png` serve para anúncios e posts (a
+  página de vendas não tem espaço para ele). Slides, roteiros e planilhas não têm capa.
+- Mudou título, subtítulo, autor ou paleta depois da capa pronta: rode `entregavel_capa` SEM --arte
+  (reaproveita o `arte.png`) e só então o PDF; o PDF avisa se a capa ficou mais antiga que o
+  `meta.json`.
+- Com `--arte` e chave KIE, uma arte NOVA é gerada e substitui a atual (gasta crédito).
 
 ## Passo 5 — Gerar o PDF (ou a planilha)
 
 ```bash
-PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/03-entregaveis/scripts"; "$PY" "$S/entregavel_pdf.py" --pasta "<E>" --paleta '<paleta>' --carrossel "<P>/pagina/imagens/carrossel"
+PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/03-entregaveis/scripts"; "$PY" "$S/entregavel_pdf.py" --pasta "<E>" --paleta '<paleta>' --carrossel "<P>/pagina/imagens/carrossel" --ordem 1
 ```
 
-- Saídas: `<E>/<slug>.pdf` e `<E>/previa/amostra-1.png` (sumário) e `amostra-2.png` (primeiro
-  capítulo). Nos slides, as amostras são os slides 2 e 3.
-- `--carrossel` copia pro carrossel da página de vendas as imagens `<slug>-01.png`, `-02.png`…
-  (capa primeiro, se existir; slides não têm capa). Só os arquivos deste entregável são
+- Saídas: `<E>/<slug>.pdf` e `<E>/previa/amostra-1.png` e `amostra-2.png`: as 2 páginas de
+  conteúdo mais visuais (com mais caixas, tabelas, checklists ou imagens; o sumário entra só
+  se tiver 8 itens ou mais). Documento sem capítulos (`#`) usa as duas primeiras páginas do
+  texto. Nos slides, as amostras são os slides 2 e 3.
+- `--carrossel` copia pro carrossel da página de vendas as imagens `NN-<slug>-01.jpg` (a capa
+  reduzida, se existir), `NN-<slug>-02.png`…, onde `NN` é o `--ordem` (1 a 99, padrão 50): o
+  carrossel segue essa ordem. Use `--ordem 1` no produto principal, `--ordem 2` no primeiro
+  bônus, `--ordem 3` no seguinte, e assim por diante. Só os arquivos deste entregável são
   substituídos; os outros do carrossel ficam. Omita `--carrossel` se o aluno não quiser.
+  Roteiro não vai pro carrossel (o script pula a cópia e avisa).
 - Se falhar, o PDF anterior é mantido. Erros comuns: `meta.json`/`conteudo.md` faltando, erro de
   formatação, arquivo que não está em UTF-8 (peça pra salvar como UTF-8).
 - Olhe `previa/amostra-1.png` e `amostra-2.png` antes de mostrar ao aluno. Ele aprova; se pedir
@@ -114,6 +140,13 @@ PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/03-entregaveis/scri
 
 ```bash
 PY="$HOME/.maquina/venv/bin/python"; S2="$HOME/.claude/skills/02-pagina-de-vendas/scripts"; "$PY" "$S2/pagina_render.py" --projeto "<P>"
+```
+
+   Se a página já está no ar, publique de novo com o Sistema 02 para o carrossel novo aparecer
+   pros clientes:
+
+```bash
+PY="$HOME/.maquina/venv/bin/python"; S2="$HOME/.claude/skills/02-pagina-de-vendas/scripts"; "$PY" "$S2/pagina_publicar.py" --projeto "<P>"
 ```
 
 4. Diga onde estão os arquivos pra subir na área de membros (Kiwify, Hotmart, Payt…).

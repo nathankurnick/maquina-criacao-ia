@@ -5,8 +5,9 @@
 - Português do Brasil, frases curtas, na língua do público. Exemplos concretos do nicho.
 - Material grande (ebook, roteiro de curso): escreva capítulo por capítulo e mostre ao aluno
   antes de seguir.
-- Não invente estudo, estatística, citação, depoimento ou resultado de cliente. Se um dado
-  ajudaria, escreva "(confirme esta informação)" e pergunte ao aluno.
+- Não invente estudo, estatística, citação, depoimento ou resultado de cliente. Faltou estudo,
+  número ou citação: escreva "(confirme esta informação)" e pergunte ao aluno. Faltou prova
+  (depoimento, resultado de cliente): escreva "[cole aqui um depoimento real]".
 - Nicho de saúde, dinheiro ou corpo: inclua um aviso curto de que o material é educacional e
   não substitui um profissional (o aluno pode pedir pra tirar).
 - Salve `conteudo.md` e `meta.json` em UTF-8 (o gerador recusa outra codificação).
@@ -43,5 +44,7 @@ Parágrafo normal com **negrito**, *itálico* e um link [assim](https://exemplo.
 
 - `#` = capítulo (começa página nova e entra no sumário); `##` = seção (entra no sumário); `###` = subtítulo.
 - Caixas: `> **Dica:**`, `> **Atenção:**`, `> **Exemplo:**`, `> **Importante:**` (ou só `>`).
-- Imagens: coloque o arquivo em `imagens/` dentro da pasta do entregável.
+  Cada caixa é um parágrafo só (uma linha `>` em branco já encerra a caixa).
+- Imagens: coloque o arquivo em `imagens/` dentro da pasta do entregável, com nome em
+  minúsculas, sem acento, com hífens e até ~1600 px de largura.
 - Slides: separe cada slide com uma linha só com `---`.

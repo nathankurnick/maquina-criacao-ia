@@ -56,3 +56,24 @@ def test_exemplo_de_markdown_da_referencia_converte():
     exemplo = re.search(r"```markdown\n(.*?)```", ref, re.S).group(1)
     html, titulos = converter(exemplo)
     assert titulos and "caixa dica" in html and "checklist" in html and "<table>" in html
+
+
+def test_regras_da_revisao_final_no_skill():
+    t = _texto()
+    assert "--ordem 1" in t and "--ordem 2" in t
+    assert "SEM --arte" in t and "gasta crédito" in t
+    assert "roteiro" in t and "não vai pro carrossel" in t and "um deck por aula" in t
+    assert "=SUM(C2:C31)" in t and "=IF(A2>0,1,0)" in t and '"formatos"' in t
+    assert "imprime JSON" in t and "`--`" in t
+    assert "pagina/config.json" in t and "azul-laranja" in t
+    assert "minúsculas, sem acento" in t and "1600" in t
+    assert "[cole aqui um depoimento real]" in t and "(confirme esta informação)" in t
+    assert "pagina_publicar.py" in t and "mockup.png" in t and "anúncios" in t
+
+
+def test_referencias_documentam_formulas_e_caixa():
+    fmt = (SKILL / "referencias" / "formatos.md").read_text(encoding="utf-8")
+    assert "=SUM(C2:C31)" in fmt and "inglês" in fmt and "formatos" in fmt and "moeda" in fmt
+    esc = (SKILL / "referencias" / "escrita.md").read_text(encoding="utf-8")
+    assert "um parágrafo" in esc and "[cole aqui um depoimento real]" in esc and "(confirme esta informação)" in esc
+    assert "minúsculas, sem acento" in esc and "1600" in esc
