@@ -1,0 +1,59 @@
+# tests/test_entregavel_md.py
+from entregavel_md import converter, dividir_slides
+
+
+def test_titulos_com_id_e_lista_do_sumario():
+    html, titulos = converter("# Começo\n\ntexto\n\n## Parte A\n\n## Parte A\n\n### Sub")
+    assert '<h1 id="comeco">Começo</h1>' in html
+    assert '<h2 id="parte-a">Parte A</h2>' in html and '<h2 id="parte-a-2">Parte A</h2>' in html
+    assert "<h3" in html
+    assert titulos == [{"nivel": 1, "texto": "Começo", "id": "comeco"},
+                       {"nivel": 2, "texto": "Parte A", "id": "parte-a"},
+                       {"nivel": 2, "texto": "Parte A", "id": "parte-a-2"}]
+
+
+def test_paragrafos_juntam_linhas_e_escapam():
+    html, _ = converter("linha um\nlinha <dois>\n\noutro")
+    assert "<p>linha um linha &lt;dois&gt;</p>" in html and "<p>outro</p>" in html
+
+
+def test_inline():
+    html, _ = converter("**forte** e *leve* e `x<y` e [site](https://a.com?b=1&c=2) e [ruim](javascript:alert(1))")
+    assert "<strong>forte</strong>" in html and "<em>leve</em>" in html
+    assert "<code>x&lt;y</code>" in html
+    assert '<a href="https://a.com?b=1&amp;c=2">site</a>' in html
+    assert 'href="javascript' not in html
+
+
+def test_listas_e_checklist():
+    html, _ = converter("- a\n* b\n\n1. um\n2. dois\n\n- [ ] fazer\n- [x] feito")
+    assert "<ul><li>a</li><li>b</li></ul>" in html
+    assert "<ol><li>um</li><li>dois</li></ol>" in html
+    assert '<ul class="checklist"><li>fazer</li><li class="feito">feito</li></ul>' in html
+
+
+def test_caixas_de_destaque():
+    html, _ = converter("> **Dica:** beba água\n> todo dia\n\n> texto comum")
+    assert '<aside class="caixa dica"><p><strong>Dica:</strong> beba água todo dia</p></aside>' in html
+    assert '<aside class="caixa"><p>texto comum</p></aside>' in html
+
+
+def test_tabela_e_hr():
+    html, _ = converter("| Dia | Treino |\n|---|---|\n| Seg | A |\n| Ter | B |\n\n---")
+    assert "<table><thead><tr><th>Dia</th><th>Treino</th></tr></thead>" in html
+    assert "<tr><td>Ter</td><td>B</td></tr>" in html and "<hr>" in html
+
+
+def test_imagens_seguras():
+    html, _ = converter("![Foto](imagens/prato.png)\n\n![x](../segredo.png)\n\n![y](/etc/a.png)\n\n![z](https://c.com/i.png)")
+    assert '<figure><img src="imagens/prato.png" alt="Foto"></figure>' in html
+    assert "segredo" not in html and "/etc" not in html
+    assert 'src="https://c.com/i.png"' in html
+
+
+def test_dividir_slides():
+    assert dividir_slides("# A\ntexto\n---\n# B\n\n---\n") == ["# A\ntexto", "# B"]
+
+
+def test_texto_vazio():
+    assert converter("") == ("", [])
