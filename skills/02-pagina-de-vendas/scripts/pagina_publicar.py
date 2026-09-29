@@ -20,7 +20,7 @@ try:
     from nucleo.erros import MaquinaErro, registrar_log  # noqa: E402
     from nucleo.netlify import publicar_pasta  # noqa: E402
     NUCLEO_OK = True
-except ImportError:
+except Exception:  # ImportError ou núcleo quebrado
     NUCLEO_OK = False
     MaquinaErro = RuntimeError
 

@@ -279,13 +279,22 @@ def test_troca_do_site_nao_deixa_site_antigo(tmp_path):
     assert (p / "pagina" / "site" / "index.html").exists()
 
 
-def test_recupera_site_antigo_sobrado_de_queda_entre_renames(tmp_path):
+def test_recupera_site_antigo_sobrado_de_queda_entre_renames(tmp_path, monkeypatch):
     p = _projeto(tmp_path)
     antigo = p / "pagina" / ".site-antigo"
     antigo.mkdir()
     (antigo / "index.html").write_text("SOBROU")
-    pr.montar_site(p)  # não há "site": recupera e depois substitui
-    assert (p / "pagina" / "site" / "index.html").exists()
+    original = Path.rename
+
+    def rename(self, alvo):
+        if self.name == ".site-novo":
+            raise OSError("falhou")
+        return original(self, alvo)
+
+    monkeypatch.setattr(Path, "rename", rename)
+    with pytest.raises(OSError):
+        pr.montar_site(p)
+    assert (p / "pagina" / "site" / "index.html").read_text() == "SOBROU"
     assert not antigo.exists()
 
 
