@@ -8,6 +8,29 @@ import pytest
 import entregavel_pdf as ep
 
 
+def _capa_falsa(p, w=1240, h=1754):
+    import struct
+    import zlib
+
+    def chunk(t, d):
+        return struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d))
+
+    linha = b"\x00" + bytes([200, 60, 30]) * w
+    (p / "capa.png").write_bytes(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0))
+                                 + chunk(b"IDAT", zlib.compress(linha * h)) + chunk(b"IEND", b""))
+
+
+def _tamanho_jpeg(d):
+    i = 2
+    while i < len(d):
+        marc = d[i + 1]
+        n = int.from_bytes(d[i + 2:i + 4], "big")
+        if marc in (0xC0, 0xC1, 0xC2):
+            return int.from_bytes(d[i + 7:i + 9], "big"), int.from_bytes(d[i + 5:i + 7], "big")
+        i += 2 + n
+    raise AssertionError("sem SOF")
+
+
 def _pasta(tmp_path, tipo="ebook", md=None, meta=None):
     p = tmp_path / "proj" / "entregaveis" / "guia-do-pao"
     p.mkdir(parents=True)
@@ -68,7 +91,7 @@ def test_gerar_pdf_de_verdade_com_amostras_e_carrossel(tmp_path):
     assert r["pdf"] == pdf and pdf.read_bytes()[:4] == b"%PDF"
     assert len(re.findall(rb"/Type\s*/Page(?!s)", pdf.read_bytes())) >= 6
     assert [a.name for a in r["amostras"]] == ["amostra-1.png", "amostra-2.png"]
-    assert sorted(x.name for x in carrossel.iterdir()) == ["guia-do-pao-01.png", "guia-do-pao-02.png"]
+    assert sorted(x.name for x in carrossel.iterdir()) == ["50-guia-do-pao-01.png", "50-guia-do-pao-02.png"]
     assert not (p / ".render.html").exists()
 
 
@@ -149,21 +172,58 @@ def test_slides_amostras_sao_os_slides_2_e_3(tmp_path):
 
 
 def test_carrossel_so_apaga_os_proprios_arquivos(tmp_path):
-    p = _pasta(tmp_path, md="# Um\n\ntexto")
+    pytest.importorskip("playwright")
+    p = _pasta(tmp_path, md="# Um\n\ntexto")  # slug guia-do-pao
     car = tmp_path / "proj" / "pagina" / "imagens" / "carrossel"
     car.mkdir(parents=True)
-    for nome in ("guia-do-pao-01.png", "guia-foto.png", "guia-do-pao-99.png"):
+    velhos = ("50-guia-do-pao-01.png", "50-guia-do-pao-99.png", "07-guia-do-pao-02.jpg")  # meus (qualquer NN)
+    alheios = ("50-guia-foto.png", "guia-do-pao-01.png", "50-guia-do-pao-x.png", "aluno.png", "50-guia-do-pao-01.webp")
+    for nome in velhos + alheios:
         (car / nome).write_bytes(b"x")
     outro = tmp_path / "proj" / "entregaveis" / "guia"
     outro.mkdir()
     (outro / "meta.json").write_text('{"titulo": "G"}')
     (outro / "conteudo.md").write_text("# G\n\ntexto")
-    pytest.importorskip("playwright")
     _gerar_ou_pular(outro)
     ep.gerar(outro, "azul-laranja", carrossel=car)
-    assert (car / "guia-do-pao-01.png").read_bytes() == b"x"
-    assert (car / "guia-foto.png").read_bytes() == b"x"
-    assert (car / "guia-01.png").exists()
+    assert (car / "50-guia-01.png").exists()
+    ep.gerar(p, "azul-laranja", carrossel=car, ordem=7)
+    for nome in alheios + ("50-guia-01.png",):
+        assert (car / nome).exists(), nome
+    for nome in velhos:
+        assert not (car / nome).exists(), nome
+    assert (car / "07-guia-do-pao-01.png").exists()
+
+
+def test_ordem_define_o_prefixo_e_a_ordenacao(tmp_path):
+    pytest.importorskip("playwright")
+    car = tmp_path / "car"
+    a = _pasta(tmp_path / "a", md="# Um\n\ntexto")
+    b = tmp_path / "b" / "bonus"
+    b.mkdir(parents=True)
+    (b / "meta.json").write_text('{"titulo": "B"}')
+    (b / "conteudo.md").write_text("# B\n\ntexto")
+    _gerar_ou_pular(a)
+    ep.gerar(b, "azul-laranja", carrossel=car, ordem=2)
+    ep.gerar(a, "azul-laranja", carrossel=car, ordem=1)
+    nomes = sorted(x.name for x in car.iterdir())
+    assert nomes[0].startswith("01-guia-do-pao-") and nomes[-1].startswith("02-bonus-")
+    assert ep.main(["--pasta", str(a), "--ordem", "0"]) == 1
+    assert ep.main(["--pasta", str(a), "--ordem", "100"]) == 1
+    assert ep.main(["--pasta", str(a), "--ordem", "x"]) == 1
+
+
+def test_capa_no_carrossel_e_jpeg_de_800px(tmp_path):
+    pytest.importorskip("playwright")
+    p = _pasta(tmp_path, md="# Um\n\ntexto")
+    _capa_falsa(p)
+    car = tmp_path / "car"
+    r = ep.gerar(p, "azul-laranja", carrossel=car)
+    nomes = sorted(x.name for x in car.iterdir())
+    assert nomes == ["50-guia-do-pao-01.jpg", "50-guia-do-pao-02.png", "50-guia-do-pao-03.png"]
+    d = (car / "50-guia-do-pao-01.jpg").read_bytes()
+    assert d[:3] == b"\xff\xd8\xff"
+    assert _tamanho_jpeg(d)[0] == 800 and len(r["carrossel"]) == 3
 
 
 def test_pdf_antigo_sobrevive_se_a_geracao_falha(tmp_path, monkeypatch):
@@ -187,7 +247,7 @@ def test_slides_nao_copiam_capa_pro_carrossel(tmp_path):
     car = tmp_path / "car"
     pytest.importorskip("playwright")
     r = ep.gerar(p, "grafite-ciano", carrossel=car)
-    assert len(r["carrossel"]) == 2 and (car / "guia-do-pao-01.png").read_bytes() != b"png"
+    assert len(r["carrossel"]) == 2 and (car / "50-guia-do-pao-01.png").read_bytes() != b"png"
 
 
 def test_pasta_relativa_usa_nome_da_pasta(tmp_path, monkeypatch):
@@ -208,11 +268,96 @@ def test_arquivos_fora_de_utf8_dao_mensagem_amiga(tmp_path):
         ep.gerar(p2, "azul-laranja")
 
 
-def test_amostra_1_e_o_sumario_e_a_2_o_primeiro_capitulo(tmp_path):
-    p = _pasta(tmp_path)
-    r = _gerar_ou_pular(p, "preto-dourado")
-    assert [c["alvo"] for c in r["clips"]] == ["sumario", "capitulo"]
+def test_ebook_curto_usa_dois_capitulos_e_um_so_capitulo_cai_no_main(tmp_path):
+    r = _gerar_ou_pular(_pasta(tmp_path), "preto-dourado")
+    assert [c["alvo"] for c in r["clips"]] == ["capitulo", "capitulo"]
     assert r["clips"][0]["y"] < r["clips"][1]["y"]
     p2 = _pasta(tmp_path / "c", md="# Só\n\ntexto")
     (p2 / "meta.json").write_text('{"titulo": "X", "tipo": "guia"}')
-    assert [c["alvo"] for c in _gerar_ou_pular(p2)["clips"]] == ["sumario", "capitulo"]
+    r2 = _gerar_ou_pular(p2)
+    assert [c["alvo"] for c in r2["clips"]] == ["main", "main"]
+    assert [_tamanho_png(a) for a in r2["amostras"]] == [(794, 1123), (794, 1123)]
+
+
+def _rico(n_caixas):
+    return "\n\n".join(f"> **Dica:** dica número {i}" for i in range(n_caixas))
+
+
+def test_amostras_escolhem_os_capitulos_mais_visuais(tmp_path):
+    md = ("# Introdução\n\n" + "Texto corrido sem nada especial. " * 30 + "\n\n"
+          "# Capítulo rico\n\n" + _rico(3) + "\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n"
+          "# Capítulo simples\n\ntexto\n\n# Capítulo médio\n\n" + _rico(1))
+    r = _gerar_ou_pular(_pasta(tmp_path, md=md))
+    assert [c["alvo"] for c in r["clips"]] == ["capitulo", "capitulo"]
+    ys = [c["y"] for c in r["clips"]]
+    assert ys[1] - ys[0] >= 2 * 1123  # rico (2º capítulo) primeiro, médio (4º) depois; intro e simples ficam de fora
+
+
+def test_empate_de_pontuacao_segue_a_ordem_do_documento(tmp_path):
+    md = "# A\n\n" + _rico(1) + "\n\n# B\n\n" + _rico(1) + "\n\n# C\n\n" + _rico(1)
+    r = _gerar_ou_pular(_pasta(tmp_path, md=md))
+    assert r["clips"][0]["y"] < r["clips"][1]["y"]
+
+
+def test_sumario_longo_vai_primeiro(tmp_path):
+    md = "\n\n".join(f"# Capítulo {i}\n\ntexto {i}" for i in range(1, 9))
+    r = _gerar_ou_pular(_pasta(tmp_path, md=md))
+    assert [c["alvo"] for c in r["clips"]] == ["sumario", "capitulo"]
+
+
+def test_sumario_curto_nao_e_candidato(tmp_path):
+    md = "# A\n\ntexto\n\n# B\n\n" + _rico(2)
+    r = _gerar_ou_pular(_pasta(tmp_path, md=md))
+    assert [c["alvo"] for c in r["clips"]] == ["capitulo", "capitulo"]
+
+
+def test_checklist_so_com_h2_usa_recortes_do_main(tmp_path):
+    md = "## Antes\n\n" + "\n".join(f"- [ ] item {i}" for i in range(80)) + "\n\n## Depois\n\n- [ ] fim"
+    p = _pasta(tmp_path, tipo="checklist", md=md, meta={"titulo": "C", "tipo": "checklist"})
+    r = _gerar_ou_pular(p)
+    assert [c["alvo"] for c in r["clips"]] == ["main", "main"]
+    assert r["clips"][1]["y"] - r["clips"][0]["y"] == 1123
+    assert [_tamanho_png(a) for a in r["amostras"]] == [(794, 1123), (794, 1123)]
+
+
+def test_capa_desatualizada_avisa(tmp_path, capsys):
+    import os
+    p = _pasta(tmp_path, md="# Um\n\ntexto")
+    _capa_falsa(p, 100, 141)
+    os.utime(p / "capa.png", (1000, 1000))
+    os.utime(p / "meta.json", (2000, 2000))
+    r = _gerar_ou_pular(p)
+    assert any("mais antiga que o meta.json" in a for a in r["avisos"])
+    assert ep.main(["--pasta", str(p)]) == 0
+    assert "⚠️ A capa (capa.png) é mais antiga que o meta.json" in capsys.readouterr().out
+    os.utime(p / "capa.png", (3000, 3000))
+    assert not _gerar_ou_pular(p)["avisos"]
+
+
+def test_roteiro_nao_vai_pro_carrossel(tmp_path, capsys):
+    pytest.importorskip("playwright")
+    p = _pasta(tmp_path, tipo="roteiro", md="# Aula 1\n\ntexto")
+    car = tmp_path / "car"
+    assert ep.main(["--pasta", str(p), "--carrossel", str(car)]) == 0
+    assert not car.exists() or not list(car.iterdir())
+    assert "roteiro" in capsys.readouterr().out.lower()
+
+
+def test_amostras_antigas_so_saem_depois_de_render_ok(tmp_path, monkeypatch):
+    pytest.importorskip("playwright")
+    p = _pasta(tmp_path)
+    (p / "previa").mkdir()
+    (p / "previa" / "amostra-1.png").write_bytes(b"velha")
+    (p / "previa" / "amostra-2.png").write_bytes(b"velha")
+
+    def falha(*a, **k):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(ep, "_salvar_pdf", falha)
+    with pytest.raises(RuntimeError):
+        ep.gerar(p, "azul-laranja")
+    assert (p / "previa" / "amostra-1.png").read_bytes() == b"velha"
+    monkeypatch.undo()
+    r = _gerar_ou_pular(p)
+    assert r["amostras"][0].read_bytes() != b"velha" and sorted(x.name for x in (p / "previa").iterdir()) == [
+        "amostra-1.png", "amostra-2.png"]

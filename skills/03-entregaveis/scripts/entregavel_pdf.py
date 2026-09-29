@@ -1,7 +1,7 @@
 # skills/03-entregaveis/scripts/entregavel_pdf.py
 """Gera o PDF diagramado de um entregável (A4 ou slides 16:9) + amostras pro carrossel da página.
 
-Uso: python entregavel_pdf.py --pasta <P>/entregaveis/<slug> [--paleta nome] [--carrossel <pasta>]
+Uso: python entregavel_pdf.py --pasta <P>/entregaveis/<slug> [--paleta nome] [--carrossel <pasta>] [--ordem 1-99]
 Lê meta.json + conteudo.md (+ capa.png se existir) e grava <slug>.pdf e previa/amostra-N.png.
 """
 import argparse
@@ -39,7 +39,7 @@ A4_W, A4_H = 794, 1123
 class _Parser(argparse.ArgumentParser):
     def error(self, message):
         print(f"❌ Comando incompleto ({message}). Use: entregavel_pdf.py --pasta <pasta do entregável> "
-              "[--paleta nome] [--carrossel <pasta>]", file=sys.stderr)
+              "[--paleta nome] [--carrossel <pasta>] [--ordem 1-99]", file=sys.stderr)
         raise SystemExit(1)
 
 
@@ -109,7 +109,53 @@ def _salvar_pdf(pg, opcoes: dict) -> None:
     pg.pdf(**opcoes)
 
 
-def gerar(pasta: Path, paleta_nome: str, carrossel: "Path | None" = None) -> dict:
+_JS_CANDIDATOS = """() => {
+  const topo = el => el.getBoundingClientRect().top + window.scrollY;
+  const caps = [...document.querySelectorAll('.capitulo')].map((el, i) => {
+    const t0 = topo(el);
+    const visuais = [...el.querySelectorAll('.caixa, table, .checklist, figure')]
+      .filter(v => topo(v) - t0 < %(alto)d).length;
+    return {i, y: t0, pontos: visuais};
+  });
+  const s = document.querySelector('.sumario');
+  const m = document.querySelector('main');
+  return {caps, sumario: s ? {y: topo(s), itens: s.querySelectorAll('li').length} : null,
+          main: m ? topo(m) : 0};
+}"""
+
+
+def escolher_alvos(cand: dict) -> list:
+    """Devolve [(alvo, y)] das 2 páginas mais visuais; cai em recortes do <main> se faltar candidato."""
+    caps = sorted(cand["caps"], key=lambda c: (-c["pontos"], c["i"]))
+    alvos = []
+    if cand["sumario"] and cand["sumario"]["itens"] >= 8:
+        alvos.append(("sumario", cand["sumario"]["y"]))
+    alvos += [("capitulo", c["y"]) for c in caps]
+    alvos = alvos[:2]
+    if len(alvos) < 2:
+        return [("main", cand["main"]), ("main", cand["main"] + A4_H)]
+    return alvos
+
+
+def _capa_antiga(pasta: Path) -> bool:
+    capa, meta = pasta / "capa.png", pasta / "meta.json"
+    return capa.exists() and meta.exists() and meta.stat().st_mtime > capa.stat().st_mtime
+
+
+def _capa_jpeg(pg, capa: Path, destino: Path) -> None:
+    """Capa reduzida (800px de largura, JPEG qualidade 82) renderizada pelo próprio Chromium."""
+    tmp = capa.parent / ".capa-jpeg.html"
+    tmp.write_text('<!doctype html><body style="margin:0"><img id="i" style="display:block;width:800px" '
+                   f'src="{e(capa.name)}"></body>', encoding="utf-8")
+    try:
+        pg.set_viewport_size({"width": 800, "height": 1200})
+        pg.goto(tmp.as_uri(), wait_until="load")
+        pg.query_selector("#i").screenshot(path=str(destino), type="jpeg", quality=82)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def gerar(pasta: Path, paleta_nome: str, carrossel: "Path | None" = None, ordem: int = 50) -> dict:
     from playwright.sync_api import sync_playwright
 
     pasta = Path(pasta).resolve()
@@ -117,11 +163,19 @@ def gerar(pasta: Path, paleta_nome: str, carrossel: "Path | None" = None) -> dic
     md_arq = pasta / "conteudo.md"
     if not md_arq.exists():
         raise ValueError(f"Não achei {md_arq}. Escreva o conteúdo do entregável antes de gerar o PDF.")
-    capa = "capa.png" if (pasta / "capa.png").exists() and meta["tipo"] != "slides" else ""
+    slides = meta["tipo"] == "slides"
+    capa = "capa.png" if (pasta / "capa.png").exists() and not slides else ""
     try:
         markdown = md_arq.read_text(encoding="utf-8")
     except UnicodeDecodeError as err:
         raise ValueError(f"O {md_arq} não está em UTF-8. Abra e salve o arquivo como UTF-8.") from err
+    avisos: list[str] = []
+    if capa and _capa_antiga(pasta):
+        avisos.append("⚠️ A capa (capa.png) é mais antiga que o meta.json — se mudou título, subtítulo, autor ou "
+                      "paleta, rode a capa de novo (sem --arte) antes do PDF.")
+    if carrossel is not None and meta["tipo"] == "roteiro":
+        carrossel = None
+        avisos.append("ℹ️ Roteiro é material interno do curso: não copiei imagens pro carrossel da página.")
     documento = montar_html(meta, markdown, paleta_nome, capa)
     render = pasta / ".render.html"
     render.write_text(documento, encoding="utf-8")
@@ -129,55 +183,70 @@ def gerar(pasta: Path, paleta_nome: str, carrossel: "Path | None" = None) -> dic
     pdf_tmp = pasta / ".render.pdf"
     previa = pasta / "previa"
     previa.mkdir(exist_ok=True)
-    for velho in previa.glob("amostra-*.png"):
-        velho.unlink()
     amostras: list[Path] = []
+    novas: list[Path] = []
     clips: list[dict] = []
+    capa_jpg = pasta / ".capa-carrossel.jpg"
     try:
         with sync_playwright() as p:
             nav = p.chromium.launch()
             try:
-                if meta["tipo"] == "slides":
+                if slides:
                     pg = nav.new_page(viewport={"width": 1280, "height": 720})
                 else:
                     pg = nav.new_page(viewport={"width": A4_W, "height": A4_H})
                 pg.goto(render.as_uri(), wait_until="load")
                 pg.emulate_media(media="print")
                 opcoes = {"path": str(pdf_tmp), "print_background": True, "prefer_css_page_size": True}
-                if meta["tipo"] != "slides":
+                if not slides:
                     opcoes.update(display_header_footer=True, header_template="<span></span>",
                                   footer_template=RODAPE)
                 _salvar_pdf(pg, opcoes)
-                slides = meta["tipo"] == "slides"
                 pg.emulate_media(media="screen")
-                if not slides:  # cada bloco vira uma "página" A4 com as margens do @page
+                if slides:
+                    alvos = []
+                    for el in pg.query_selector_all(".slide")[1:3]:
+                        alvos.append(("slide", el.bounding_box()["y"] + pg.evaluate("window.scrollY")))
+                    largura, alto = 1280, 720
+                else:
+                    # cada bloco vira uma "página" A4 com as margens do @page
                     pg.add_style_tag(content=(
                         ".sumario,.capitulo{width:794px;min-height:1123px;padding:18mm 16mm 20mm;"
                         "background:#fff;break-before:auto;break-after:auto}.capitulo h1{break-before:auto}"
                         "main{display:block}"))
-                if slides:
-                    alvos = pg.query_selector_all(".slide")[1:3]
-                    largura, alto = 1280, 720
-                else:
-                    sumario = pg.query_selector_all(".sumario")
-                    caps = pg.query_selector_all(".capitulo")
-                    alvos = ((sumario + caps)[:2] if sumario else caps[:2])
                     largura, alto = A4_W, A4_H
-                for k, el in enumerate(alvos, 1):
-                    caixa = el.bounding_box()  # relativo ao viewport; soma o scroll pra clip da página inteira
-                    y = caixa["y"] + pg.evaluate("window.scrollY")
-                    destino = previa / f"amostra-{k}.png"
+                    cand = pg.evaluate(_JS_CANDIDATOS % {"alto": A4_H})
+                    alvos = escolher_alvos(cand)
+                    if alvos[0][0] == "main":  # o <main> vira a "página": sem o padding duplo dos capítulos
+                        pg.add_style_tag(content=("main{padding:18mm 16mm 20mm;min-height:2246px}"
+                                                  ".capitulo{padding:0;min-height:0}"))
+                        alvos = [("main", pg.evaluate("document.querySelector('main').getBoundingClientRect().top"
+                                                      " + window.scrollY") + k * A4_H) for k in (0, 1)]
+                for k, (alvo, y) in enumerate(alvos, 1):
+                    destino = previa / f".amostra-{k}.png"
+                    novas.append(destino)
                     pg.screenshot(path=str(destino), full_page=True,
                                   clip={"x": 0, "y": y, "width": largura, "height": alto})
-                    amostras.append(destino)
-                    clips.append({"alvo": (el.get_attribute("class") or "").split()[0], "y": y})
+                    clips.append({"alvo": alvo, "y": y})
+                if carrossel is not None and capa:
+                    _capa_jpeg(pg, pasta / "capa.png", capa_jpg)
             finally:
                 try:
                     nav.close()
                 except Exception:
                     pass
+        # render ok: agora sim troca as amostras antigas pelas novas
+        for velho in previa.glob("amostra-*.png"):
+            velho.unlink()
+        for k, tmp in enumerate(novas, 1):
+            destino = previa / f"amostra-{k}.png"
+            tmp.replace(destino)
+            amostras.append(destino)
     except BaseException:
         pdf_tmp.unlink(missing_ok=True)
+        for tmp in novas:
+            tmp.unlink(missing_ok=True)
+        capa_jpg.unlink(missing_ok=True)
         raise
     else:
         pdf_tmp.replace(pdf)
@@ -188,17 +257,28 @@ def gerar(pasta: Path, paleta_nome: str, carrossel: "Path | None" = None) -> dic
     if carrossel is not None:
         carrossel = Path(carrossel)
         carrossel.mkdir(parents=True, exist_ok=True)
-        padrao = re.compile(rf"{re.escape(pasta.name)}-\d{{2}}\.png")
+        padrao = re.compile(rf"\d{{2}}-{re.escape(pasta.name)}-\d{{2}}\.(png|jpg)")
         for velho in carrossel.iterdir():
             if padrao.fullmatch(velho.name):
                 velho.unlink()
-        tem_capa = (pasta / "capa.png").exists() and meta["tipo"] != "slides"
-        origens = ([pasta / "capa.png"] if tem_capa else []) + amostras
+        prefixo = f"{ordem:02d}-{pasta.name}"
+        origens = ([capa_jpg] if capa else []) + amostras
         for n, origem in enumerate(origens, 1):
-            destino = carrossel / f"{pasta.name}-{n:02d}.png"
+            destino = carrossel / f"{prefixo}-{n:02d}{origem.suffix if origem != capa_jpg else '.jpg'}"
             shutil.copyfile(origem, destino)
             copiados.append(destino)
-    return {"pdf": pdf, "amostras": amostras, "carrossel": copiados, "clips": clips}
+        capa_jpg.unlink(missing_ok=True)
+    return {"pdf": pdf, "amostras": amostras, "carrossel": copiados, "clips": clips, "avisos": avisos}
+
+
+def _ordem(txt: str) -> int:
+    try:
+        n = int(txt)
+    except ValueError:
+        raise argparse.ArgumentTypeError("precisa ser um número de 1 a 99") from None
+    if not 1 <= n <= 99:
+        raise argparse.ArgumentTypeError("precisa ser um número de 1 a 99")
+    return n
 
 
 def main(argv: "list[str] | None" = None) -> int:
@@ -206,6 +286,7 @@ def main(argv: "list[str] | None" = None) -> int:
     ap.add_argument("--pasta", required=True)
     ap.add_argument("--paleta", default="")
     ap.add_argument("--carrossel", default="")
+    ap.add_argument("--ordem", type=_ordem, default=50)
     try:
         args = ap.parse_args(argv)
     except SystemExit as s:
@@ -217,7 +298,7 @@ def main(argv: "list[str] | None" = None) -> int:
     try:
         print("📄 Gerando o PDF…")
         r = gerar(Path(args.pasta), args.paleta or PALETA_PADRAO,
-                  Path(args.carrossel) if args.carrossel else None)
+                  Path(args.carrossel) if args.carrossel else None, args.ordem)
     except KeyboardInterrupt:
         print("Cancelado.", file=sys.stderr)
         return 130
@@ -234,6 +315,8 @@ def main(argv: "list[str] | None" = None) -> int:
         else:
             print("❌ Algo deu errado ao gerar o PDF. Detalhes no log da Máquina (~/.maquina/log).", file=sys.stderr)
         return 1
+    for aviso in r["avisos"]:
+        print(aviso)
     print(f"✅ PDF pronto: {r['pdf']}")
     for a in r["amostras"]:
         print(f"   Amostra: {a}")
