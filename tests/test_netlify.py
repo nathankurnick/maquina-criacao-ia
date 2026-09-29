@@ -105,3 +105,55 @@ def test_json_que_nao_e_objeto_vira_netlify_erro(monkeypatch):
     monkeypatch.setattr(netlify.urllib.request, "urlopen", lambda req, timeout=None: Resp(b"[1]"))
     with pytest.raises(netlify.NetlifyErro, match="resposta inesperada"):
         netlify._requisitar("GET", "/user", "t")
+
+
+def _zip_de(monkeypatch, pasta):
+    capturado = {}
+
+    def falso(metodo, caminho, token, corpo=None, tipo="application/json"):
+        if caminho == "/sites":
+            return {"id": "s1"}
+        capturado["nomes"] = sorted(zipfile.ZipFile(io.BytesIO(corpo)).namelist())
+        return {"ssl_url": "u"}
+    monkeypatch.setattr(netlify, "_requisitar", falso)
+    netlify.publicar_pasta("t", pasta)
+    return capturado["nomes"]
+
+
+def test_zip_so_tem_arquivos_web(tmp_path, monkeypatch):
+    (tmp_path / "index.html").write_text("x")
+    (tmp_path / "style.css").write_text("x")
+    (tmp_path / "conteudo.json").write_text("{}")
+    (tmp_path / "notas.md").write_text("x")
+    (tmp_path / ".env").write_text("SEGREDO")
+    (tmp_path / ".git").mkdir()
+    (tmp_path / ".git" / "a.html").write_text("x")
+    assert _zip_de(monkeypatch, tmp_path) == ["index.html", "style.css"]
+
+
+def test_zip_ignora_symlinks(tmp_path, monkeypatch):
+    site = tmp_path / "site"
+    site.mkdir()
+    (site / "index.html").write_text("x")
+    segredo = tmp_path / "segredo.txt"
+    segredo.write_text("s")
+    (site / "link.txt").symlink_to(segredo)
+    fora = tmp_path / "fora"
+    fora.mkdir()
+    (fora / "b.html").write_text("x")
+    (site / "pasta").symlink_to(fora)
+    assert _zip_de(monkeypatch, site) == ["index.html"]
+
+
+def test_deploy_sem_url_vira_erro(tmp_path, monkeypatch):
+    (tmp_path / "index.html").write_text("x")
+    monkeypatch.setattr(netlify, "_requisitar", lambda m, c, t, corpo=None, tipo="": {"id": "d"})
+    with pytest.raises(netlify.NetlifyErro, match="resposta inesperada"):
+        netlify.publicar_pasta("t", tmp_path, site_id="s")
+
+
+def test_404_vira_site_nao_existe(monkeypatch):
+    _urlopen_que_levanta(monkeypatch, _http_erro(404))
+    with pytest.raises(netlify.NetlifySiteNaoExiste, match="não existe mais"):
+        netlify._requisitar("POST", "/sites/x/deploys", "t")
+    assert issubclass(netlify.NetlifySiteNaoExiste, netlify.NetlifyErro)
