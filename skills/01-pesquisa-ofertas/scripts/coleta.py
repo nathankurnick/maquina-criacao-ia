@@ -73,8 +73,9 @@ def _normalizar(obj: dict, snap: dict, aid: str) -> dict:
         "repeticoes": _inteiro(obj.get("collation_count") or obj.get("collationCount")),
         "cta": _texto(snap.get("cta_text")),
         "link": _texto(snap.get("link_url") or snap.get("linkUrl") or card.get("link_url")),
+        "pagina_id": _texto(snap.get("page_id") or obj.get("page_id") or obj.get("pageId")),
         "titulo": _texto(snap.get("title") or card.get("title")),
-        "texto": str(texto)[:800],
+        "texto": _texto(texto)[:800],
         "videos": videos,
         "imagens": imagens,
         "midia": "video" if videos else ("imagem" if imagens else "nenhuma"),
@@ -85,6 +86,9 @@ class Coletor:
     def __init__(self) -> None:
         self.anuncios: list[dict] = []
         self._vistos: set[str] = set()
+        self.cancelado = False
+        self.erro_nome = ""
+        self.login_wall = False
 
     def colher(self, raiz) -> None:
         # Iterativo (pilha) pra não estourar recursão em JSON profundo; reversed mantém a ordem.

@@ -7,7 +7,7 @@ from coleta import Coletor, montar_url
 
 def _ad(aid, **extra):
     base = {
-        "ad_archive_id": aid,
+        "ad_archive_id": aid, "page_id": "555",
         "start_date": 1700000000,
         "collation_count": 3,
         "snapshot": {
@@ -58,7 +58,7 @@ def test_colher_normaliza_e_deduplica_preservando_ordem():
         "id": "2", "pagina": "Loja X", "inicio": 1700000000, "repeticoes": 3,
         "cta": "Saiba mais", "link": "https://loja.com/oferta", "titulo": "Título",
         "texto": "Copy do anúncio", "videos": ["https://cdn/v1.mp4?x=1"], "imagens": [],
-        "midia": "video",
+        "midia": "video", "pagina_id": "555",
     }
 
 
@@ -159,3 +159,16 @@ def test_colher_coage_campos_de_texto_pra_str():
     c.colher(ad)
     a = c.anuncios[0]
     assert a["pagina"] == "" and a["cta"] == "" and a["link"] == "12" and a["titulo"] == ""
+
+
+def test_coletor_declara_estado_inicial():
+    c = Coletor()
+    assert c.cancelado is False and c.erro_nome == "" and c.login_wall is False
+
+
+def test_texto_nao_string_e_coagido():
+    c = Coletor()
+    c.colher({"ad_archive_id": "1", "snapshot": {"body": {"text": {"a": 1}}, "cards": [{"body": 42}]}})
+    assert c.anuncios[0]["texto"] == ""
+    c.colher({"ad_archive_id": "2", "snapshot": {"body": {"text": 12345}}})
+    assert c.anuncios[1]["texto"] == "12345"

@@ -6,13 +6,34 @@ O Facebook bloqueia navegador invisível; por isso a janela abre — o aluno nã
 """
 import argparse
 import json
+import os
 import sys
+import traceback
 from datetime import datetime
 from pathlib import Path
 
 from coleta import Coletor, montar_url
 
-BOTOES_COOKIES = ("Allow all cookies", "Allow all", "Accept all", "Permitir todos os cookies", "Aceitar tudo")
+# Privacidade primeiro: recusa o que for opcional; "aceitar tudo" só se nenhum botão de recusa existir.
+BOTOES_COOKIES_PRIVADOS = ("Only allow essential cookies", "Decline optional cookies",
+                           "Permitir somente cookies essenciais", "Recusar cookies opcionais")
+BOTOES_COOKIES_ACEITAR = ("Allow all cookies", "Allow all", "Accept all", "Permitir todos os cookies", "Aceitar tudo")
+BOTOES_COOKIES = BOTOES_COOKIES_PRIVADOS + BOTOES_COOKIES_ACEITAR
+MSG_LOGIN = ("❌ O Facebook pediu login nessa sessão. Abra facebook.com/ads/library no seu Chrome normal, "
+             "confira se abre sem login, e tente de novo — ou use o modo manual.")
+
+
+def _log_tecnico(e: BaseException) -> None:
+    """Grava o traceback completo em ~/.maquina/log/maquina.log. Nunca levanta erro."""
+    try:
+        base = Path(os.environ.get("MAQUINA_HOME") or Path.home() / ".maquina") / "log"
+        base.mkdir(parents=True, exist_ok=True)
+        with (base / "maquina.log").open("a", encoding="utf-8") as f:
+            f.write(f"[{datetime.now().isoformat(timespec='seconds')}] raspar.py\n")
+            f.write("".join(traceback.format_exception(type(e), e, e.__traceback__)) + "\n")
+    except Exception:
+        pass
+
 USER_AGENT = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
               "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
 
@@ -34,6 +55,9 @@ def rolar_e_coletar(pagina, coletor: Coletor, rolagens: int = 25) -> None:
             coletor.colher_html(pagina.content())
     pagina.wait_for_timeout(3000)
     coletor.colher_html(pagina.content())
+    url_atual = str(getattr(pagina, "url", "") or "")
+    if not coletor.anuncios and ("/login" in url_atual or "checkpoint" in url_atual):
+        coletor.login_wall = True
 
 
 def abrir_e_coletar(url: str, rolagens: int = 25, coletor: "Coletor | None" = None) -> "tuple[list[dict], bool]":
@@ -54,13 +78,14 @@ def abrir_e_coletar(url: str, rolagens: int = 25, coletor: "Coletor | None" = No
     with sync_playwright() as p:
         try:
             opcoes = {"headless": False, "args": ["--disable-blink-features=AutomationControlled"]}
+            contexto = {"viewport": {"width": 1280, "height": 1600}, "locale": "pt-BR"}
             try:
                 navegador = p.chromium.launch(channel="chrome", **opcoes)
             except Exception:
                 navegador = p.chromium.launch(**opcoes)
+                contexto["user_agent"] = USER_AGENT  # só o Chromium embutido precisa disfarçar o "HeadlessChrome"
             try:
-                ctx = navegador.new_context(viewport={"width": 1280, "height": 1600},
-                                            locale="pt-BR", user_agent=USER_AGENT)
+                ctx = navegador.new_context(**contexto)
                 pagina = ctx.new_page()
                 pagina.on("response", ao_responder)
                 pagina.goto(url, wait_until="domcontentloaded", timeout=60000)
@@ -69,6 +94,7 @@ def abrir_e_coletar(url: str, rolagens: int = 25, coletor: "Coletor | None" = No
                 except Exception as e:  # janela fechada, crash, navegação destruída: fica com o parcial
                     interrompido = True
                     coletor.erro_nome = type(e).__name__
+                    _log_tecnico(e)
             finally:
                 try:
                     navegador.close()
@@ -186,16 +212,25 @@ def main(argv: "list[str] | None" = None) -> int:
                 codigo = salvar(coletor.anuncios)
                 if codigo not in (None, 1):
                     return codigo
+                if codigo is None:
+                    print(f"Pesquisa cancelada — salvei {len(coletor.anuncios)} "
+                          f"{'anúncio' if len(coletor.anuncios) == 1 else 'anúncios'} em "
+                          f"{saida / 'anuncios.json'}.", file=sys.stderr)
+                    return 130
             print("Pesquisa cancelada.", file=sys.stderr)
             return 130
         if not isinstance(e, Exception):
             raise
+        _log_tecnico(e)
         if not coletor.anuncios:
             print(_mensagem_erro(e), file=sys.stderr)
             return 1
         anuncios, interrompido, erro_nome = coletor.anuncios, True, type(e).__name__
 
     if not anuncios:
+        if getattr(coletor, "login_wall", False):
+            print(MSG_LOGIN, file=sys.stderr)
+            return 1
         if interrompido:
             print("❌ O navegador parou antes de achar qualquer anúncio (a janela fechou ou a internet "
                   "caiu) — tente de novo em alguns minutos. " + OFERTA_MANUAL, file=sys.stderr)

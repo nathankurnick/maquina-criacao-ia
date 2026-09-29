@@ -5,8 +5,11 @@ O Claude lê pagina.txt e dobra.png/pagina-NN.png pra dissecar a oferta.
 """
 import argparse
 import json
+import os
 import re
 import sys
+import traceback
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -23,6 +26,18 @@ MAX_FATIAS = 20
 LARGURA_MAX = 1280
 SAIDAS_ANTIGAS = ("dobra.png", "pagina.png", "pagina.txt", "dados.json")
 OFERTA_MANUAL = "Se preferir, mande prints e o texto da página que eu sigo com eles."
+
+
+def _log_tecnico(e: BaseException) -> None:
+    """Grava o traceback completo em ~/.maquina/log/maquina.log. Nunca levanta erro."""
+    try:
+        base = Path(os.environ.get("MAQUINA_HOME") or Path.home() / ".maquina") / "log"
+        base.mkdir(parents=True, exist_ok=True)
+        with (base / "maquina.log").open("a", encoding="utf-8") as f:
+            f.write(f"[{datetime.now().isoformat(timespec='seconds')}] capturar.py\n")
+            f.write("".join(traceback.format_exception(type(e), e, e.__traceback__)) + "\n")
+    except Exception:
+        pass
 
 
 def _unicos(itens, limite=10):
@@ -172,6 +187,7 @@ def main(argv: "list[str] | None" = None) -> int:
         print("Captura cancelada.", file=sys.stderr)
         return 130
     except Exception as e:
+        _log_tecnico(e)
         print(_mensagem_erro(e), file=sys.stderr)
         return 1
     print(f"✅ Página capturada: {dados['titulo'] or args.url}")

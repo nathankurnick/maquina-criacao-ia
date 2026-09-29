@@ -308,3 +308,16 @@ def test_capturar_pagina_local_de_verdade(tmp_path):
     salvo = json.loads((out / "dados.json").read_text())
     assert salvo["garantia"] == "garantia de 30 dias" and salvo["prints"] == dados["prints"]
     assert salvo["url_final"].startswith("file://")
+
+
+def test_erro_inesperado_grava_traceback_no_log(tmp_path, monkeypatch, capsys):
+    home = tmp_path / "home"
+    monkeypatch.setenv("MAQUINA_HOME", str(home))
+
+    def quebra(url, saida):
+        raise RuntimeError("net::ERR_FALHOU")
+    monkeypatch.setattr(capturar, "capturar", quebra)
+    assert capturar.main(["--url", "https://x.com", "--saida", str(tmp_path / "o")]) == 1
+    assert "Traceback" not in capsys.readouterr().err
+    log = (home / "log" / "maquina.log").read_text()
+    assert "Traceback" in log and "net::ERR_FALHOU" in log and "capturar.py" in log

@@ -16,7 +16,7 @@ class _Botao:
 
     def click(self, timeout):
         self._p.cliques.append(self._n)
-        if self._n != "Allow all":
+        if self._n != self._p.botao_existente:
             raise TimeoutError("não achou")
 
 
@@ -31,6 +31,8 @@ class _Mouse:
 class PaginaFalsa:
     def __init__(self):
         self.rolagens, self.cliques, self.esperas = 0, [], 0
+        self.botao_existente = "Decline optional cookies"
+        self.url = "https://www.facebook.com/ads/library/?q=x"
         self.mouse = _Mouse(self)
 
     def wait_for_timeout(self, ms):
@@ -48,7 +50,7 @@ def test_rolar_e_coletar_rola_aceita_cookies_e_colhe_durante():
     p, c = PaginaFalsa(), Coletor()
     raspar.rolar_e_coletar(p, c, rolagens=7)
     assert p.rolagens == 7
-    assert p.cliques[:2] == ["Allow all cookies", "Allow all"]
+    assert p.cliques == ["Only allow essential cookies", "Decline optional cookies"]
     # colhe no início (0), a cada 3 rolagens (após 1, 4, 7) e no fim (7 de novo, dedup)
     assert [a["id"] for a in c.anuncios] == ["ad0", "ad1", "ad4", "ad7"]
 
@@ -158,7 +160,7 @@ def test_main_ctrl_c_salva_parcial_e_sai_130(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(raspar, "abrir_e_coletar", f)
     assert raspar.main(["--termo", "x", "--saida", str(tmp_path)]) == 130
     cap = capsys.readouterr()
-    assert "Pesquisa cancelada." in cap.err and "Traceback" not in cap.err
+    assert "Pesquisa cancelada — salvei 1 anúncio em" in cap.err and "Traceback" not in cap.err
     assert json.loads((tmp_path / "anuncios.json").read_text()) == [{"id": "9"}]
 
 
@@ -189,6 +191,9 @@ def test_saida_nao_gravavel_sai_1_antes_do_navegador(tmp_path, monkeypatch, caps
     assert not chamou and "pasta" in capsys.readouterr().err
 
 
+_CONTEXTOS = []
+
+
 class _Ctx:
     def __init__(self, falha_em):
         self.falha_em = falha_em
@@ -201,6 +206,8 @@ class _PagFalha(PaginaFalsa):
     def __init__(self, falha_em):
         super().__init__()
         self.falha_em = falha_em
+        if falha_em == "login":
+            self.url = "https://www.facebook.com/login/?next=x"
 
     def on(self, *a):
         pass
@@ -210,6 +217,8 @@ class _PagFalha(PaginaFalsa):
             raise RuntimeError("net::ERR_FAILED")
 
     def content(self):
+        if self.falha_em in ("nenhuma", "login"):
+            return "<html></html>" if self.falha_em == "login" else super().content()
         if self.rolagens >= 2:
             raise RuntimeError("Target page, context or browser has been closed")
         return super().content()
@@ -220,19 +229,25 @@ class _Nav:
         self.falha_em = falha_em
 
     def new_context(self, **k):
+        _CONTEXTOS.append(k)
         return _Ctx(self.falha_em)
 
     def close(self):
         raise RuntimeError("já morreu")
 
 
-def _instala_playwright_falso(monkeypatch, falha_em):
+def _instala_playwright_falso(monkeypatch, falha_em, sem_chrome=False):
     import sys
     import types
     mod = types.ModuleType("playwright.sync_api")
 
     class _P:
-        chromium = types.SimpleNamespace(launch=lambda **k: _Nav(falha_em))
+        @staticmethod
+        def _abrir(**k):
+            if sem_chrome and k.get("channel"):
+                raise RuntimeError("Chromium distribution 'chrome' is not found")
+            return _Nav(falha_em)
+        chromium = types.SimpleNamespace(launch=lambda **k: _P._abrir(**k))
 
     class _CM:
         def __enter__(self):
@@ -346,3 +361,51 @@ def test_rolagens_sem_valor_em_portugues(tmp_path, capsys):
     assert raspar.main(["--termo", "x", "--saida", str(tmp_path), "--rolagens"]) == 1
     err = capsys.readouterr().err
     assert "expected" not in err and "--rolagens" in err
+
+
+def test_abrir_e_coletar_usa_chrome_real_sem_forcar_user_agent(monkeypatch):
+    _instala_playwright_falso(monkeypatch, "nenhuma")
+    raspar.abrir_e_coletar("https://x", 1)
+    assert "user_agent" not in _CONTEXTOS[-1]
+
+
+def test_abrir_e_coletar_fallback_chromium_mantem_user_agent(monkeypatch):
+    _instala_playwright_falso(monkeypatch, "nenhuma", sem_chrome=True)
+    raspar.abrir_e_coletar("https://x", 1)
+    assert _CONTEXTOS[-1]["user_agent"] == raspar.USER_AGENT
+
+
+def test_login_wall_sai_1_com_mensagem(tmp_path, monkeypatch, capsys):
+    def f(url, rolagens, coletor=None):
+        coletor.login_wall = True
+        return [], False
+    monkeypatch.setattr(raspar, "abrir_e_coletar", f)
+    assert raspar.main(["--termo", "x", "--saida", str(tmp_path)]) == 1
+    assert "O Facebook pediu login nessa sessão" in capsys.readouterr().err
+
+
+def test_abrir_e_coletar_detecta_login_wall(monkeypatch):
+    _instala_playwright_falso(monkeypatch, "login")
+    coletor = Coletor()
+    anuncios, _ = raspar.abrir_e_coletar("https://x", 1, coletor)
+    assert coletor.login_wall is True
+
+
+def test_ctrl_c_parcial_diz_quantos_salvou(tmp_path, monkeypatch, capsys):
+    def f(url, rolagens, coletor=None):
+        coletor.anuncios.extend([{"id": "1"}, {"id": "2"}])
+        raise KeyboardInterrupt
+    monkeypatch.setattr(raspar, "abrir_e_coletar", f)
+    assert raspar.main(["--termo", "x", "--saida", str(tmp_path)]) == 130
+    err = capsys.readouterr().err
+    assert "Pesquisa cancelada — salvei 2 anúncios em" in err and "anuncios.json" in err
+
+
+def test_erro_inesperado_grava_traceback_no_log(tmp_path, monkeypatch, capsys):
+    home = tmp_path / "home"
+    monkeypatch.setenv("MAQUINA_HOME", str(home))
+    monkeypatch.setattr(raspar, "abrir_e_coletar", _quebra(RuntimeError("net::ERR_X")))
+    assert raspar.main(["--termo", "x", "--saida", str(tmp_path / "o")]) == 1
+    assert "Traceback" not in capsys.readouterr().err
+    log = (home / "log" / "maquina.log").read_text()
+    assert "Traceback" in log and "net::ERR_X" in log
