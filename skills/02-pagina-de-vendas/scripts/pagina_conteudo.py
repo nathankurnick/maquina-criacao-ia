@@ -62,7 +62,7 @@ CONFIG_PADRAO = {
     "paleta": PALETA_PADRAO, "pixel_meta": "", "pixel_google": "", "head_html": "",
     "seo_titulo": "", "seo_descricao": "", "site_id": "", "url": "",
 }
-CHAVES_EDITAVEIS = ("paleta", "pixel_meta", "pixel_google", "head_html", "seo_titulo", "seo_descricao")
+CHAVES_EDITAVEIS = ("paleta", "pixel_meta", "pixel_google", "head_html", "seo_titulo", "seo_descricao", "url")
 
 
 def _objeto(v) -> dict:
@@ -106,6 +106,12 @@ def url_segura(u: str) -> bool:
     u = (u or "").strip()
     return bool(re.match(r"(?i)https?://[^\s]+$", u) or re.match(r"#\S*$", u)
                 or (re.match(r"/(?![/\\])\S*$", u) is not None))
+
+
+def checkout_valido(u: str) -> bool:
+    """Link de pagamento: só https com host real, e nunca o texto-modelo SEU-LINK."""
+    u = (u or "").strip()
+    return bool(re.fullmatch(r"https://[^\s/]+\.[^\s]+", u)) and "seu-link" not in u.lower()
 
 
 def _plano(v, nome_padrao: str, ativo_padrao: bool, destaque: bool) -> dict:
@@ -169,9 +175,13 @@ def normalizar(bruto: object) -> "tuple[dict, list[str]]":
     basico = _plano(p.get("basico"), "PLANO BÁSICO", True, False)
     premium = _plano(p.get("premium"), "PLANO PREMIUM", False, True)
     for pl in (basico, premium):
-        if pl["checkoutUrl"] and not url_segura(pl["checkoutUrl"]):
+        if pl["checkoutUrl"] and not checkout_valido(pl["checkoutUrl"]):
             pl["checkoutUrl"] = ""
-            avisos.append("planos: o link de checkout não é um endereço válido (precisa começar com https://).")
+            pl["ativo"] = False
+            aviso = ("planos: o link de checkout precisa ser o endereço real de pagamento, começando com "
+                     "https:// (ex.: https://pay.kiwify.com.br/…)")
+            if aviso not in avisos:
+                avisos.append(aviso)
     if premium["ativo"] and (not premium["checkoutUrl"] or premium["checkoutUrl"] == basico["checkoutUrl"]):
         premium["ativo"] = False
         avisos.append("planos: o premium está sem link ou com o mesmo checkout do básico — escondido.")
@@ -207,7 +217,8 @@ def normalizar(bruto: object) -> "tuple[dict, list[str]]":
     r = bloco("rodape")
     disclaimer = _texto(r.get("disclaimer"))
     rodape = {"ativo": True, "nomeProduto": _texto(r.get("nomeProduto")),
-              "disclaimer": disclaimer if len(disclaimer) >= 20 else DISCLAIMER_PADRAO}
+              "disclaimer": ("" if disclaimer == "-" else
+                             disclaimer if len(disclaimer) >= 20 else DISCLAIMER_PADRAO)}
 
     return ({"hero": hero, "carrossel": carrossel, "paraQuem": para_quem, "conteudo": conteudo,
              "incluso": incluso, "entrega": entrega, "bonus": bonus, "depoimentos": depoimentos,
@@ -261,4 +272,6 @@ def validar_valor(chave: str, valor: str) -> str:
         raise ValueError("O ID do Pixel da Meta tem só números (8 a 20 dígitos).")
     if chave == "pixel_google" and v and not re.fullmatch(r"(G|AW|GT)-[A-Z0-9]+", v):
         raise ValueError('O ID do Google começa com "G-" ou "AW-" (ex.: G-ABC123).')
+    if chave == "url" and v and not re.fullmatch(r"https://[^\s/]+\.[^\s]+", v):
+        raise ValueError("O endereço da página precisa começar com https:// (ex.: https://minha-pagina.netlify.app).")
     return v if chave != "head_html" else valor

@@ -67,9 +67,9 @@ Qualquer bloco pode ter `"ativo": false` pra ficar escondido. Trechos da headlin
     "basico": {
       "nome": "ACESSO COMPLETO",
       "itens": ["Ebook de receitas", "Vídeos curtos", "Todos os bônus"],
-      "precoDe": "R$ 97",
+      "precoDe": "",
       "precoPor": "R$ 27",
-      "checkoutUrl": "https://pay.kiwify.com.br/SEU-LINK",
+      "checkoutUrl": "https://pay.kiwify.com.br/abc123",
       "cta": "QUERO MEU ACESSO"
     },
     "premium": { "ativo": false }
@@ -94,7 +94,11 @@ Qualquer bloco pode ter `"ativo": false` pra ficar escondido. Trechos da headlin
 
 - **oferta.md** (`maquina oferta mostrar <slug>`): nome, promessa, mecanismo, avatar, preço,
   entregáveis, bônus, garantia e link de checkout. Não crie entregável ou bônus que não esteja
-  lá — se faltar algo, pergunte ao aluno e grave com `maquina oferta adicionar`.
+  lá — se faltar algo, pergunte ao aluno e grave com
+  `maquina oferta adicionar <slug> entregaveis|bonus '<item>'` (item que começa com "-": ponha
+  `--` antes, ex.: `maquina oferta adicionar <slug> bonus -- '-30% no próximo curso'`).
+- Não invente estudo, estatística ou citação; se precisar de um dado, escreva "confirme esta
+  informação" e pergunte ao aluno.
 - **Dissecação do Sistema 01** (se existir `<P>/pesquisa/escolhida.json` → `pasta_oferta/dissecacao.md`):
   use a ESTRUTURA que vende (ordem de argumentos, tipo de bônus, ancoragem), nunca as frases.
 
@@ -109,11 +113,16 @@ Qualquer bloco pode ter `"ativo": false` pra ficar escondido. Trechos da headlin
 - `incluso.itens`: 5 itens reforçando o `conteudo` com outras palavras.
 - `bonus.itens`: os bônus do oferta.md; `valor` é o valor de referência que o aluno confirmar.
 - `faq.itens`: 6 perguntas; pelo menos 3 respondem às objeções mais fortes do avatar.
-- `planos.basico.precoPor`: exatamente o preço do oferta.md; `checkoutUrl`: o `link_checkout`, que precisa começar com `https://` (senão o plano fica
-  desligado e o render avisa).
+- `planos.basico.precoPor`: exatamente o preço do oferta.md. `precoDe` só se o aluno der um
+  preço de âncora; senão deixe vazio (nunca invente).
+- `planos.basico.checkoutUrl`: o `link_checkout` do oferta.md, que precisa ser o endereço real
+  de pagamento e começar com `https://` (só https; o texto-modelo `SEU-LINK` não vale). Sem link
+  real ainda → deixe `"checkoutUrl": ""` (a página monta pra prévia, mas não publica). Link
+  inválido desliga o plano e o render avisa.
   Premium só se o aluno tiver um segundo link de checkout, diferente do básico.
 - `garantia.dias`: o número de dias da garantia do oferta.md.
-- `rodape.disclaimer`: pode deixar vazio (entra o aviso padrão).
+- `rodape.disclaimer`: o aviso legal é padrão (deixe vazio e entra o texto padrão); se o aluno
+  quiser tirar, use `"-"` (o rodapé fica só com a linha de direitos reservados).
 
 ## Prova
 

@@ -193,8 +193,9 @@ def _faq(b):
 
 def _rodape(b, ano):
     nome = f" {e(b['nomeProduto'])}." if b["nomeProduto"] else ""
+    aviso = f'<p class="disclaimer">{e(b["disclaimer"])}</p>' if b["disclaimer"] else ""
     return (f'<footer class="escura rodape"><div class="caixa caixa-estreita"><p>© {ano}{nome} '
-            f'Todos os direitos reservados.</p><p class="disclaimer">{e(b["disclaimer"])}</p></div></footer>\n')
+            f'Todos os direitos reservados.</p>{aviso}</div></footer>\n')
 
 
 def _pixels(meta: str, google: str) -> str:

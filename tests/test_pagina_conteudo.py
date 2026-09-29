@@ -169,3 +169,34 @@ def test_url_segura_rejeita_barra_invertida_apos_barra():
     assert not pc.url_segura("/\\evil.com")
     assert not pc.url_segura("//evil.com")
     assert pc.url_segura("/obrigado")
+
+
+@pytest.mark.parametrize("ruim", ["#", "/x", "http://pay.x.com/a", "https://pay.kiwify.com.br/SEU-LINK",
+                                  "https://pay.kiwify.com.br/seu-link", "https:///x", "https://semponto"])
+def test_checkout_estrito_desliga_plano_com_aviso(ruim):
+    bruto = _completo()
+    bruto["planos"]["basico"]["checkoutUrl"] = ruim
+    c, avisos = pc.normalizar(bruto)
+    assert c["planos"]["basico"]["checkoutUrl"] == "" and not c["planos"]["basico"]["ativo"]
+    assert any("endereço real de pagamento" in a and "https://pay.kiwify.com.br/" in a for a in avisos)
+
+
+def test_checkout_https_real_passa():
+    c, avisos = pc.normalizar(_completo())
+    assert c["planos"]["basico"]["ativo"] and not any("endereço real" in a for a in avisos)
+
+
+def test_disclaimer_hifen_significa_sem_aviso():
+    bruto = _completo()
+    bruto["rodape"]["disclaimer"] = "-"
+    c, _ = pc.normalizar(bruto)
+    assert c["rodape"]["disclaimer"] == ""
+
+
+def test_url_editavel_no_config_so_https():
+    assert pc.validar_valor("url", " https://x.netlify.app ") == "https://x.netlify.app"
+    for ruim in ("http://x.com", "x.com", "javascript:alert(1)"):
+        with pytest.raises(ValueError):
+            pc.validar_valor("url", ruim)
+    with pytest.raises(ValueError):
+        pc.validar_valor("site_id", "abc")

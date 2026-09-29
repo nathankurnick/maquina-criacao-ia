@@ -186,7 +186,7 @@ def test_href_perigoso_nunca_vai_pro_html():
     for ruim in ("javascript:alert(1)", "data:text/html,x", "texto solto", "//evil.com"):
         bruto = {"hero": {"headline": "H"}, "planos": {"basico": {"checkoutUrl": ruim, "precoPor": "R$ 1"}}}
         c, avisos = pc.normalizar(bruto)
-        assert any("não é um endereço válido" in a for a in avisos)
+        assert any("endereço real de pagamento" in a for a in avisos)
         h = _html(conteudo=c)
         assert ruim not in h and 'class="cta" href="#"' in h
     assert pr._cta("javascript:alert(1)", "X") == '<a class="cta" href="#">X</a>'
@@ -315,3 +315,11 @@ def test_recuperacao_falha_no_rollback_levanta_erro_original(tmp_path, monkeypat
     monkeypatch.setattr(Path, "rename", rename)
     with pytest.raises(OSError, match="original"):
         pr.montar_site(p)
+
+
+def test_disclaimer_hifen_rodape_so_com_copyright():
+    c, _ = pc.normalizar(dict(_conteudo(), rodape={"nomeProduto": "X", "disclaimer": "-"}))
+    h = _html(conteudo=c)
+    assert "Todos os direitos reservados" in h and 'class="disclaimer"' not in h
+    c2, _ = pc.normalizar(_conteudo())
+    assert 'class="disclaimer"' in _html(conteudo=c2)
