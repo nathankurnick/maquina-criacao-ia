@@ -39,6 +39,8 @@ def _obrigatorio(bruto: dict, campo: str, onde: str) -> str:
 def _normalizar(bruto, posicao: int) -> dict:
     if not isinstance(bruto, dict):
         raise ValueError(f"anúncio #{posicao}: precisa ser um objeto com id, angulo, formato…")
+    if "id" in bruto and bruto["id"] is not None and not isinstance(bruto["id"], str):
+        raise ValueError(f'anúncio #{posicao}: o id precisa ser um texto (ex.: "dor-cozinha").')
     ident = _slug(_txt(bruto.get("id")))
     if not ident:
         raise ValueError(f"anúncio #{posicao}: o id precisa ter letras ou números.")

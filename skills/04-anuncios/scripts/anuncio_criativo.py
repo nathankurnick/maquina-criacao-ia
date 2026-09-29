@@ -18,7 +18,7 @@ try:
     from nucleo.chaves import obter_chave
     from nucleo.erros import registrar_log
     from nucleo.kie import KieErro, KieErroPermanente, gerar_imagem
-    from nucleo.paletas import PALETA_PADRAO, paleta
+    from nucleo.paletas import PALETA_PADRAO, PALETAS, paleta
     NUCLEO_OK = True
 except Exception:  # noqa: BLE001
     NUCLEO_OK = False
@@ -29,7 +29,7 @@ except Exception:  # noqa: BLE001
     class KieErroPermanente(KieErro):  # type: ignore[no-redef]
         pass
 
-from anuncio_dados import ler_anuncios, paleta_do_projeto  # noqa: E402
+from anuncio_dados import _slug, ler_anuncios, paleta_do_projeto  # noqa: E402
 
 CSS = Path(__file__).resolve().parent.parent / "template" / "criativo.css"
 FORMATOS_IMG = {"1x1": (1080, 1080, "1:1"), "9x16": (1080, 1920, "9:16")}
@@ -119,16 +119,25 @@ def _gerar_artes(pasta_projeto: Path, anuncio: dict) -> None:
     if not prompt:
         print("ℹ️ Esse anúncio não tem visual.prompt — sigo com o fundo na cor da paleta.")
         return
-    chave = obter_chave("KIE_API_KEY")
     nomes = {fmt: artes / f"arte-{anuncio['id']}-{fmt}.png" for fmt in FORMATOS_IMG}
+    faltam = {}
+    for fmt, dados in FORMATOS_IMG.items():
+        if nomes[fmt].exists():
+            print(f"ℹ️ Reaproveitei a arte {nomes[fmt].name} (apague o arquivo pra gerar outra).")
+        else:
+            faltam[fmt] = dados
+    if not faltam:
+        return
+    chave = obter_chave("KIE_API_KEY")
     if not chave:
         print("ℹ️ Sem a chave da KIE. Gere em outra ferramenta (sem texto na imagem) e salve em:")
-        for fmt, (_, _, proporcao) in FORMATOS_IMG.items():
+        for fmt, (_, _, proporcao) in faltam.items():
             print(f"   {nomes[fmt]}  (proporção {proporcao})")
-        print(f"   Prompt: {prompt}\n   Depois rode de novo sem --gerar-arte.")
+        print(f"   Prompt: {prompt}\n   Depois rode de novo sem --gerar-arte "
+              "(as imagens já saíram com o fundo da paleta).")
         return
     artes.mkdir(parents=True, exist_ok=True)
-    for fmt, (_, _, proporcao) in FORMATOS_IMG.items():
+    for fmt, (_, _, proporcao) in faltam.items():
         print(f"🎨 Gerando a cena {proporcao} na KIE (até ~2 minutos)…")
         try:
             gerar_imagem(chave, prompt, proporcao, nomes[fmt])
@@ -163,20 +172,26 @@ def main(argv: "list[str] | None" = None) -> int:
         anuncios = ler_anuncios(projeto / "anuncios")
         if args.gerar_arte and not args.id:
             raise ValueError("Gere a arte um anúncio por vez: use --id <id> junto com --gerar-arte.")
+        if args.paleta and args.paleta not in PALETAS:
+            raise ValueError(f'Paleta "{args.paleta}" não existe. Use uma destas: {", ".join(PALETAS)}.')
         if args.id:
-            escolhidos = [a for a in anuncios if a["id"] == args.id]
+            id_slug = _slug(args.id)
+            escolhidos = [a for a in anuncios if a["id"] == id_slug]
             if not escolhidos:
                 raise ValueError(f'Não achei o anúncio "{args.id}" no anuncios.json.')
             if escolhidos[0]["formato"] != "estatico":
                 raise ValueError(f'"{args.id}" é vídeo — criativo de imagem só pra anúncio estático.')
         else:
             escolhidos = [a for a in anuncios if a["formato"] == "estatico"]
+        if not escolhidos:
+            print("Nenhum anúncio estático no anuncios.json.")
+            return 0
         nome_paleta = args.paleta or paleta_do_projeto(projeto) or PALETA_PADRAO
         for a in escolhidos:
             if args.gerar_arte:
                 _gerar_artes(projeto, a)
             produto = a["visual"]["produto"]
-            if produto and not (projeto / "entregaveis" / produto / "mockup.png").exists():
+            if produto and a["visual"]["layout"] != "centro" and not (projeto / "entregaveis" / produto / "mockup.png").exists():
                 print(f"⚠️ {a['id']}: não achei o mockup de '{produto}' (rode a capa no Sistema 03). Sigo sem produto.")
             for arq in compor(projeto, a, nome_paleta):
                 print(f"✅ {arq}")

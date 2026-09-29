@@ -51,6 +51,8 @@ def avaliar(anuncio: dict) -> list[str]:
     headline = anuncio.get("headline_imagem") or ""
     if len(headline.split()) > 12:
         avisos.append("Texto demais na imagem: mais de 12 palavras na headline da arte reduz a entrega. Dica: corte pra até 8.")
+    if len(anuncio.get("titulo") or "") > 40:
+        avisos.append("Título longo: mais de 40 caracteres é cortado no feed.")
     return avisos
 
 

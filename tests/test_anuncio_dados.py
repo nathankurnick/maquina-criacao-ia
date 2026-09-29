@@ -86,3 +86,8 @@ def test_arquivo_ilegivel(tmp_path):
     (tmp_path / "anuncios.json").mkdir()
     with pytest.raises(ValueError, match="Não consegui ler"):
         ad.ler_anuncios(tmp_path)
+
+
+def test_id_que_nao_e_texto(tmp_path):
+    with pytest.raises(ValueError, match="o id precisa ser um texto"):
+        ad.ler_anuncios(_gravar(tmp_path, [_estatico(id=123)]))

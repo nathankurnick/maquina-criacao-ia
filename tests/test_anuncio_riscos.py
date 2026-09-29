@@ -88,3 +88,8 @@ def test_ctrl_c(monkeypatch, capsys):
     monkeypatch.setattr(ar, "ler_anuncios", boom)
     assert ar.main(["--pasta", "x"]) == 130
     assert "Cancelado." in capsys.readouterr().err
+
+
+def test_titulo_longo():
+    assert any("Título longo" in a for a in ar.avaliar(_a(titulo="x" * 41)))
+    assert not any("Título longo" in a for a in ar.avaliar(_a(titulo="x" * 40)))
