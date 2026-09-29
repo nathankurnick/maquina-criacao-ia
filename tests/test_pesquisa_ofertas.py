@@ -186,3 +186,29 @@ def test_tabela_escapa_pipe_e_quebra_de_linha():
     assert "a\\|b" in linha and "Lo\\|ja" in linha and "\n" not in linha
     assert linha.replace("\\|", "").count("|") == 9
     assert "| Volume |" in of.tabela_markdown([o])
+
+
+def test_campos_de_tipo_errado_nao_quebram():
+    base = {"link": "https://a.com/x", "texto": "Texto grande o bastante"}
+    ruins = [
+        {**base, "id": "1", "pagina": ["A"]},
+        {**base, "id": "2", "pagina": {"n": 1}},
+        {**base, "id": "3", "videos": [None, 5]},
+        {**base, "id": "4", "videos": 5},
+        {**base, "id": "5", "midia": ["x"]},
+        {**base, "id": "6", "videos": ["", "https://c/v.mp4"], "imagens": "x"},
+    ]
+    r = of.analisar(ruins, HOJE)
+    o = r["ofertas"][0]
+    assert o["anuncios"] == 6 and o["anunciantes"] == []
+    assert o["midia"] in ("vídeo", "imagem", "misto")
+    assert o["criativos"] == 6 and o["volume"] == 6
+
+
+@pytest.mark.parametrize("link,chave", [
+    ("https://api.whatsapp.com/send?phone=5511999&text=oi", "whatsapp.com/5511999"),
+    ("https://api.whatsapp.com/send", "whatsapp.com/send"),
+    ("https://wa.me/5511999", "wa.me/5511999"),
+])
+def test_chave_whatsapp(link, chave):
+    assert of.chave_oferta(link) == chave

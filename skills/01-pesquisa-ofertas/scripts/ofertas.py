@@ -23,6 +23,7 @@ ENCURTADORES = (
 )
 _LOCALES = {"pt-br", "pt", "en", "es", "en-us", "es-es"}
 _GENERICOS = {"marketplace", "produtos", "product", "p"}
+_IGNORAR_SEGMENTO = _LOCALES | _GENERICOS
 _TRACKER = re.compile(r"(^|\.)(trk|track|tracking)\.|\.(site|click|info)$")
 
 
@@ -52,7 +53,10 @@ def chave_oferta(link: str) -> "str | None":
             return f"{host}/{partes[0]}" if partes else host
     for p in PLATAFORMAS:
         if host == p or host.endswith("." + p):
-            segmento = next((x for x in partes if x.lower() not in _LOCALES | _GENERICOS), "")
+            if p == "whatsapp.com" and partes[:1] == ["send"]:
+                fone = parse_qs(u.query).get("phone", [""])[0].strip()
+                return f"{p}/{fone}" if fone else f"{p}/send"
+            segmento = next((x for x in partes if x.lower() not in _IGNORAR_SEGMENTO), "")
             return f"{p}/{segmento}" if segmento else p
     return host
 
@@ -128,6 +132,13 @@ def analisar(anuncios: list[dict], hoje: date) -> dict:
         if a.get("id") in (None, ""):
             a["id"] = f"pos{posicao}"
         a["repeticoes"] = _repeticoes(a.get("repeticoes"))
+        if not isinstance(a.get("pagina"), str):
+            a["pagina"] = ""
+        for campo in ("videos", "imagens"):
+            v = a.get(campo)
+            a[campo] = [x for x in v if isinstance(x, str) and x.strip()] if isinstance(v, list) else []
+        if not isinstance(a.get("midia"), str):
+            a["midia"] = "video" if a["videos"] else ("imagem" if a["imagens"] else "nenhuma")
         if not isinstance(a.get("link"), str):
             a["link"] = ""
         if not isinstance(a.get("texto"), str):
