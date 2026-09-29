@@ -193,3 +193,12 @@ def test_status_json(ambiente, capsys, monkeypatch):
     d = json.loads(capsys.readouterr().out)
     assert d["chaves"] == {"KIE_API_KEY": True, "NETLIFY_TOKEN": False}
     assert d["projetos"] == ["p"] and "versao" in d
+
+
+def test_atualizar_mostra_versao_e_passos(ambiente, capsys):
+    (ambiente / "home").mkdir()
+    (ambiente / "home" / "VERSION").write_text("1.2.3\n")
+    assert cli.main(["atualizar"]) == 0
+    out = capsys.readouterr().out
+    assert "1.2.3" in out and "área de membros" in out and "Instalar Máquina.command" in out
+    assert "chaves" in out and "projetos" in out

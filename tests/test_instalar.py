@@ -133,3 +133,12 @@ def test_maquina_repassa_argumentos(tmp_path):
                        capture_output=True, text=True)
     assert r.returncode == 2
     assert "Comando inválido" in r.stderr and "isso-nao-existe" in r.stderr
+
+
+def test_instalador_mostra_versao_e_os_5_sistemas(tmp_path):
+    r, _, _ = _rodar(tmp_path)
+    assert r.returncode == 0, r.stderr
+    versao = (RAIZ / "VERSION").read_text().strip()
+    assert f"Versão {versao}" in r.stdout
+    for s in ("/01-pesquisa-ofertas", "/02-pagina-de-vendas", "/03-entregaveis", "/04-anuncios", "/05-funil"):
+        assert s in r.stdout

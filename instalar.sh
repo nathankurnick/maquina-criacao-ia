@@ -22,6 +22,7 @@ falhar() { printf '\n❌ %s\n' "$1" >&2; exit 1; }
 falhar_log() { falhar "$1 Detalhes em: $LOG"; }
 
 echo "🤖 Instalando a Máquina Criação IA..."
+echo "   Versão $(cat "$AQUI/VERSION")"
 
 command -v claude >/dev/null 2>&1 \
   || falhar "Não achei o Claude Code. Instale primeiro (https://claude.com/claude-code) e rode este instalador de novo."
@@ -102,4 +103,6 @@ if [ "$SEM_CHAVES" = "0" ]; then
 fi
 
 echo
-echo "✅ Máquina Criação IA instalada! Abra um terminal novo, rode 'claude' e digite /01-pesquisa-ofertas pra começar."
+echo "✅ Máquina Criação IA $(cat "$AQUI/VERSION") instalada!"
+echo "   Abra um terminal novo, rode 'claude' e use os sistemas:"
+echo "   /01-pesquisa-ofertas · /02-pagina-de-vendas · /03-entregaveis · /04-anuncios · /05-funil"

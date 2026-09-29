@@ -24,6 +24,16 @@ def _versao(a) -> int:
     return 0
 
 
+def _atualizar(a) -> int:
+    print(f"Você está na versão {_texto_versao()}.\n"
+          "Pra atualizar a Máquina:\n"
+          "  1. Baixe o zip da versão nova na área de membros do curso.\n"
+          "  2. Descompacte (dois cliques no arquivo .zip).\n"
+          '  3. Dê dois cliques em "Instalar Máquina.command" (se o Mac bloquear: botão direito → Abrir).\n'
+          "Suas chaves e seus projetos continuam onde estão. Depois, feche e abra o Claude de novo.")
+    return 0
+
+
 def _status(a) -> int:
     from nucleo.projeto import listar_projetos
     if a.como_json:
@@ -149,6 +159,7 @@ def _parser() -> argparse.ArgumentParser:
     p = _Parser(prog="maquina", description="Máquina Criação IA")
     sub = p.add_subparsers(dest="comando", required=True)
     sub.add_parser("versao").set_defaults(func=_versao)
+    sub.add_parser("atualizar").set_defaults(func=_atualizar)
     st = sub.add_parser("status")
     st.add_argument("--json", action="store_true", dest="como_json")
     st.set_defaults(func=_status)

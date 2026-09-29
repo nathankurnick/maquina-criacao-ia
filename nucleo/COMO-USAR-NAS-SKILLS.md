@@ -13,6 +13,7 @@ As skills chamam o núcleo sempre pelo comando `maquina` (via Bash), nunca impor
 | `maquina oferta adicionar <slug> <entregaveis\|bonus> "<item>"` | Acrescenta um item numa lista (sem duplicar) |
 | `maquina status` | Quais chaves estão ativas (decide modo automático vs manual) |
 | `maquina status --json` | Igual, em JSON: `{"versao", "chaves": {"KIE_API_KEY": true/false, "NETLIFY_TOKEN": true/false}, "projetos": [...]}` |
+| `maquina atualizar` | Mostra a versão instalada e o passo a passo pra atualizar (baixar o zip novo e rodar o instalador de novo) |
 
 Scripts Python próprios de uma skill rodam com `~/.maquina/venv/bin/python` e
 `PYTHONPATH=~/.maquina`, podendo importar `nucleo.kie`, `nucleo.netlify`,
