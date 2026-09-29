@@ -87,3 +87,24 @@ def test_projeto_novo_e_caminho_sem_valor(ambiente, capsys):
     assert "Faltou o nome do projeto." in capsys.readouterr().err
     assert cli.main(["projeto", "caminho"]) == 1
     assert "Faltou o nome (slug) do projeto" in capsys.readouterr().err
+
+
+def test_configurar_chaves_formato_ruim_nao_chama_rede_e_conta_tentativa(ambiente, monkeypatch):
+    chamadas = []
+    monkeypatch.setattr(cli, "testar_chave", lambda n, v: chamadas.append(v) or "ok")
+    respostas = iter(["com espaco", "a​b", "tambem ruim", "", ])
+    saida = []
+    cli.configurar_chaves(perguntar=lambda _: next(respostas, ""), imprimir=saida.append)
+    assert chamadas == []
+    assert sum("caracteres estranhos" in s for s in saida) == 3
+    assert chaves.ler_chaves() == {}
+
+
+def test_argparse_erro_em_portugues(ambiente, capsys):
+    import pytest
+    with pytest.raises(SystemExit) as e:
+        cli.main(["comando-que-nao-existe"])
+    assert e.value.code == 2
+    err = capsys.readouterr().err
+    assert "Comando inválido" in err and "maquina --help" in err
+    assert "usage:" not in err

@@ -6,7 +6,9 @@ import traceback
 from pathlib import Path
 
 from nucleo.caminhos import maquina_home
-from nucleo.chaves import CHAVES, ler_chaves, obter_chave, salvar_chave, testar_chave
+from nucleo.chaves import (
+    CHAVES, ler_chaves, obter_chave, salvar_chave, testar_chave, validar_formato,
+)
 from nucleo.erros import MaquinaErro, registrar_log
 
 
@@ -46,6 +48,7 @@ def configurar_chaves(perguntar=input, imprimir=print) -> None:
                 imprimir("   Pulado. Sem ela, esse recurso funciona no modo manual.")
                 break
             try:
+                valor = validar_formato(valor)
                 detalhe = testar_chave(nome, valor)
             except MaquinaErro as e:
                 imprimir(f"   ⚠️ {e}")
@@ -83,8 +86,15 @@ def _oferta(a) -> int:
     return 0
 
 
+class _Parser(argparse.ArgumentParser):
+    def error(self, message):
+        print(f"❌ Comando inválido: {message}. Veja os comandos com: maquina --help",
+              file=sys.stderr)
+        sys.exit(2)
+
+
 def _parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="maquina", description="Máquina Criação IA")
+    p = _Parser(prog="maquina", description="Máquina Criação IA")
     sub = p.add_subparsers(dest="comando", required=True)
     sub.add_parser("versao").set_defaults(func=_versao)
     sub.add_parser("status").set_defaults(func=_status)

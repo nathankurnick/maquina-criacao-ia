@@ -37,3 +37,26 @@ def test_testar_chave_despacha_pro_servico(monkeypatch):
     monkeypatch.setattr(chaves.netlify, "validar", lambda v: f"net:{v}")
     assert chaves.testar_chave("KIE_API_KEY", "a") == "kie:a"
     assert chaves.testar_chave("NETLIFY_TOKEN", "b") == "net:b"
+
+
+@pytest.mark.parametrize("valor", ["", "   ", "abc def", "abc\ndef", "abc​def", "chávé", "a\tb"])
+def test_salvar_rejeita_valor_estranho(ambiente, valor):
+    with pytest.raises(MaquinaErro, match="caracteres estranhos"):
+        chaves.salvar_chave("KIE_API_KEY", valor)
+    assert not chaves.arquivo_chaves().exists()
+
+
+def test_salvar_arquivo_preexistente_0644_termina_0600(ambiente):
+    arq = chaves.arquivo_chaves()
+    arq.parent.mkdir(parents=True)
+    arq.write_text("NETLIFY_TOKEN=n\n")
+    arq.chmod(0o644)
+    chaves.salvar_chave("KIE_API_KEY", "k")
+    assert stat.S_IMODE(arq.stat().st_mode) == 0o600
+    assert chaves.ler_chaves() == {"NETLIFY_TOKEN": "n", "KIE_API_KEY": "k"}
+    assert [p.name for p in arq.parent.iterdir()] == ["chaves.env"]
+
+
+def test_valor_com_igual_faz_ida_e_volta(ambiente):
+    chaves.salvar_chave("KIE_API_KEY", "abc==def=")
+    assert chaves.ler_chaves()["KIE_API_KEY"] == "abc==def="
