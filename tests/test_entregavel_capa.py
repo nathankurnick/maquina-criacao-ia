@@ -32,9 +32,9 @@ def test_gerar_arte_chama_kie_e_baixa(tmp_path, monkeypatch):
     monkeypatch.setattr(ec, "criar_tarefa", lambda chave, modelo, entrada: chamadas.update(
         chave=chave, modelo=modelo, entrada=entrada) or "t1")
     monkeypatch.setattr(ec, "aguardar", lambda chave, tid, intervalo=6, limite=300: {"resultUrls": ["https://u/a.png"]})
-    monkeypatch.setattr(ec, "baixar", lambda url, destino: destino.write_bytes(b"png") or destino)
+    monkeypatch.setattr(ec, "baixar", lambda url, destino: destino.write_bytes(b"\x89PNG\r\n\x1a\nx") or destino)
     destino = ec.gerar_arte(tmp_path, "pão rústico sobre mesa de madeira", "k")
-    assert destino == tmp_path / "arte.png" and destino.read_bytes() == b"png"
+    assert destino == tmp_path / "arte.png" and destino.read_bytes().startswith(b"\x89PNG")
     assert chamadas["modelo"] == "nano-banana-2"
     assert chamadas["entrada"] == {"prompt": "pão rústico sobre mesa de madeira", "aspect_ratio": "2:3",
                                    "output_format": "png"}
@@ -98,4 +98,89 @@ def test_gerar_capa_nao_deixa_temporarios(tmp_path):
         if "Executable doesn't exist" in str(e):
             pytest.skip("Chromium do Playwright não instalado")
         raise
+    assert sorted(x.name for x in p.iterdir()) == ["capa.png", "meta.json", "mockup.png"]
+
+
+PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 20
+
+
+def _kie_ok(monkeypatch, conteudo):
+    monkeypatch.setattr(ec, "criar_tarefa", lambda *a, **k: "t1")
+    monkeypatch.setattr(ec, "aguardar", lambda chave, tid, intervalo=6, limite=300: {"resultUrls": ["https://u/a.png"]})
+    monkeypatch.setattr(ec, "baixar", lambda url, destino: destino.write_bytes(conteudo) or destino)
+
+
+def test_gerar_arte_orcamento_de_tempo(tmp_path, monkeypatch):
+    vistos = {}
+    monkeypatch.setattr(ec, "criar_tarefa", lambda *a, **k: "t1")
+    monkeypatch.setattr(ec, "aguardar", lambda chave, tid, intervalo=0, limite=0: vistos.update(i=intervalo, l=limite) or {"resultUrls": ["u"]})
+    monkeypatch.setattr(ec, "baixar", lambda url, destino: destino.write_bytes(PNG))
+    ec.gerar_arte(tmp_path, "x", "k")
+    assert vistos == {"i": 5, "l": 150}
+
+
+@pytest.mark.parametrize("conteudo,ok", [(PNG, True), (b"\xff\xd8\xff\xe0abc", True),
+                                         (b"RIFF\x00\x00\x00\x00WEBPVP8 ", True), (b"<html>erro</html>", False)])
+def test_gerar_arte_valida_o_arquivo(tmp_path, monkeypatch, conteudo, ok):
+    _kie_ok(monkeypatch, conteudo)
+    (tmp_path / "arte.png").write_bytes(b"antiga")
+    if ok:
+        assert ec.gerar_arte(tmp_path, "x", "k").read_bytes() == conteudo
+    else:
+        with pytest.raises(ec.KieErro, match="não é imagem"):
+            ec.gerar_arte(tmp_path, "x", "k")
+        assert (tmp_path / "arte.png").read_bytes() == b"antiga"
+        assert not (tmp_path / ".arte.tmp.png").exists()
+
+
+def test_main_erro_inesperado_na_arte_nao_aborta(ambiente, tmp_path, monkeypatch, capsys):
+    p = _pasta(tmp_path)
+    monkeypatch.setenv("KIE_API_KEY", "k")
+    monkeypatch.setattr(ec, "gerar_arte", lambda *a: (_ for _ in ()).throw(OSError("disco")))
+    monkeypatch.setattr(ec, "gerar_capa", lambda pasta, paleta: {"capa": pasta / "capa.png", "mockup": pasta / "mockup.png"})
+    assert ec.main(["--pasta", str(p), "--arte", "x"]) == 0
+    out = capsys.readouterr().out
+    assert "erro inesperado" in out and "fundo na cor da paleta" in out
+
+
+def test_main_arte_antiga_e_reaproveitada(ambiente, tmp_path, monkeypatch, capsys):
+    p = _pasta(tmp_path)
+    (p / "arte.png").write_bytes(PNG)
+    monkeypatch.setattr(ec, "gerar_capa", lambda pasta, paleta: {"capa": pasta / "capa.png", "mockup": pasta / "mockup.png"})
+    assert ec.main(["--pasta", str(p), "--arte", "x"]) == 0  # sem chave
+    out = capsys.readouterr().out
+    assert "Usei a arte que já estava na pasta (arte.png)" in out and "fundo na cor da paleta" not in out
+    monkeypatch.setenv("KIE_API_KEY", "k")
+    monkeypatch.setattr(ec, "gerar_arte", lambda *a: (_ for _ in ()).throw(ec.KieErro("fila cheia")))
+    assert ec.main(["--pasta", str(p), "--arte", "x"]) == 0
+    out = capsys.readouterr().out
+    assert "Usei a arte que já estava" in out and "fundo na cor da paleta" not in out
+
+
+def test_main_distingue_erro_permanente(ambiente, tmp_path, monkeypatch, capsys):
+    p = _pasta(tmp_path)
+    monkeypatch.setenv("KIE_API_KEY", "k")
+    monkeypatch.setattr(ec, "gerar_capa", lambda pasta, paleta: {"capa": pasta / "capa.png", "mockup": pasta / "mockup.png"})
+    monkeypatch.setattr(ec, "gerar_arte", lambda *a: (_ for _ in ()).throw(ec.KieErroPermanente("chave ruim")))
+    ec.main(["--pasta", str(p), "--arte", "x"])
+    assert "repetir não adianta: chave ruim" in capsys.readouterr().out
+    monkeypatch.setattr(ec, "gerar_arte", lambda *a: (_ for _ in ()).throw(ec.KieErro("fila")))
+    ec.main(["--pasta", str(p), "--arte", "x"])
+    assert "tente de novo mais tarde: fila" in capsys.readouterr().out
+
+
+def test_gerar_capa_falha_mantem_capa_antiga(tmp_path, monkeypatch):
+    sync = pytest.importorskip("playwright.sync_api")
+    p = _pasta(tmp_path)
+    (p / "capa.png").write_bytes(b"velha")
+    (p / "mockup.png").write_bytes(b"velho")
+    from playwright.sync_api import Page
+
+    def quebra(self, *a, **k):
+        raise RuntimeError("screenshot falhou")
+
+    monkeypatch.setattr(Page, "screenshot", quebra)
+    with pytest.raises(RuntimeError):
+        ec.gerar_capa(p, "azul-laranja")
+    assert (p / "capa.png").read_bytes() == b"velha" and (p / "mockup.png").read_bytes() == b"velho"
     assert sorted(x.name for x in p.iterdir()) == ["capa.png", "meta.json", "mockup.png"]

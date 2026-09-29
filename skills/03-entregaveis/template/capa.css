@@ -14,5 +14,4 @@
 .livro{position:relative;width:600px;height:849px;transform:rotateY(26deg) rotateX(-6deg);transform-style:preserve-3d}
 .livro .frente{position:absolute;inset:0;background-size:100% 100%;background-position:center;border-radius:2px 8px 8px 2px;box-shadow:inset 8px 0 14px rgba(0,0,0,.28),inset -2px 0 4px rgba(255,255,255,.12)}
 .livro .lombada{position:absolute;top:0;left:-48px;width:48px;height:100%;transform-origin:right center;transform:rotateY(-90deg);background:linear-gradient(90deg,var(--pg-fundo-medio),var(--pg-fundo));border-left:6px solid var(--pg-destaque)}
-.livro .paginas{position:absolute;top:0;left:0;width:100%;height:48px;transform-origin:top center;transform:rotateX(90deg);background:repeating-linear-gradient(90deg,#f4f4f4 0 2px,#d6d6d6 2px 3px)}
 .sombra{position:absolute;width:640px;height:70px;bottom:110px;left:270px;background:radial-gradient(ellipse at center,rgba(0,0,0,.4),transparent 70%);filter:blur(10px)}

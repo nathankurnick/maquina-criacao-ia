@@ -16,13 +16,16 @@ if _HOME not in sys.path:
 try:
     from nucleo.chaves import obter_chave
     from nucleo.erros import registrar_log
-    from nucleo.kie import KieErro, aguardar, baixar, criar_tarefa
+    from nucleo.kie import KieErro, KieErroPermanente, aguardar, baixar, criar_tarefa
     from nucleo.paletas import PALETA_PADRAO, paleta
     NUCLEO_OK = True
 except Exception:  # noqa: BLE001
     NUCLEO_OK = False
 
     class KieErro(Exception):  # type: ignore[no-redef]
+        pass
+
+    class KieErroPermanente(KieErro):  # type: ignore[no-redef]
         pass
 
 from entregavel_pdf import ROTULO_TIPO, ler_meta  # noqa: E402
@@ -63,14 +66,23 @@ def html_capa(meta: dict, paleta_nome: str, arte: str = "") -> str:
 
 def html_mockup(capa_png: str, paleta_nome: str) -> str:
     return _doc(f"<div class=\"cena\"><div class=\"sombra\"></div><div class=\"livro\">"
-                f"<div class=\"lombada\"></div><div class=\"paginas\"></div>"
+                f"<div class=\"lombada\"></div>"
                 f"<div class=\"frente\" style=\"background-image:url('{e(capa_png)}')\"></div></div></div>",
                 paleta_nome)
 
 
+def _e_imagem(arq: Path) -> bool:
+    try:
+        cab = Path(arq).read_bytes()[:12]
+    except OSError:
+        return False
+    return (cab.startswith(b"\x89PNG\r\n\x1a\n") or cab.startswith(b"\xff\xd8\xff")
+            or (cab[:4] == b"RIFF" and cab[8:12] == b"WEBP"))
+
+
 def gerar_arte(pasta: Path, prompt: str, chave: str) -> Path:
     tid = criar_tarefa(chave, MODELO, {"prompt": prompt, "aspect_ratio": "2:3", "output_format": "png"})
-    resultado = aguardar(chave, tid, intervalo=6, limite=300)
+    resultado = aguardar(chave, tid, intervalo=5, limite=150)
     urls = resultado.get("resultUrls") or []
     if not urls:
         raise KieErro("A KIE terminou mas não devolveu a imagem. Tente de novo.")
@@ -78,6 +90,8 @@ def gerar_arte(pasta: Path, prompt: str, chave: str) -> Path:
     destino, tmp = pasta / "arte.png", pasta / ".arte.tmp.png"
     try:
         baixar(urls[0], tmp)
+        if not _e_imagem(tmp):
+            raise KieErro("A KIE devolveu um arquivo que não é imagem.")
         os.replace(tmp, destino)
     finally:
         tmp.unlink(missing_ok=True)
@@ -136,17 +150,36 @@ def main(argv: "list[str] | None" = None) -> int:
     try:
         ler_meta(pasta)
         if args.arte:
+            aviso = ""
             chave = obter_chave("KIE_API_KEY")
             if not chave:
-                print("ℹ️ Sem a chave da KIE, a capa sai com fundo na cor da paleta. Se quiser uma arte,\n"
-                      f"   gere em outra ferramenta com este prompt e salve como {pasta / 'arte.png'}:\n"
-                      f"   {args.arte}\n   Depois rode este comando de novo.")
+                aviso = "sem_chave"
             else:
                 print("🎨 Gerando a arte da capa na KIE (pode levar 1–2 minutos)…")
                 try:
                     gerar_arte(pasta, args.arte, chave)
-                except KieErro as err:
-                    print(f"⚠️ A arte não saiu ({err}). Sigo com o fundo na cor da paleta.")
+                except KeyboardInterrupt:
+                    raise
+                except Exception as err:  # noqa: BLE001 — a arte é opcional, nunca derruba a capa
+                    if isinstance(err, KieErroPermanente):
+                        aviso = f"A arte não saiu (repetir não adianta: {err})."
+                    elif isinstance(err, KieErro):
+                        aviso = f"A arte não saiu (tente de novo mais tarde: {err})."
+                    else:
+                        try:
+                            registrar_log(traceback.format_exc())
+                        except Exception:
+                            pass
+                        aviso = "A arte não saiu (erro inesperado; detalhes no log da Máquina)."
+            if aviso:
+                sobra = ("Usei a arte que já estava na pasta (arte.png)." if (pasta / "arte.png").exists()
+                         else "Sigo com o fundo na cor da paleta.")
+                if aviso == "sem_chave":
+                    print("ℹ️ Sem a chave da KIE não dá pra gerar a arte aqui. " + sobra + "\n"
+                          f"   Se quiser uma arte nova, gere em outra ferramenta com este prompt e salve como {pasta / 'arte.png'}:\n"
+                          f"   {args.arte}\n   Depois rode este comando de novo.")
+                else:
+                    print(f"⚠️ {aviso} {sobra}")
         r = gerar_capa(pasta, args.paleta or PALETA_PADRAO)
     except KeyboardInterrupt:
         print("Cancelado.", file=sys.stderr)
