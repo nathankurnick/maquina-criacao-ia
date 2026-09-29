@@ -4,6 +4,8 @@ Você escreve `<P>/pagina/conteudo.json` com este formato (12 blocos, na ordem d
 Qualquer bloco pode ter `"ativo": false` pra ficar escondido. Trechos da headline entre
 `**asteriscos duplos**` saem na cor de destaque.
 
+O `checkoutUrl` do exemplo está vazio de propósito: use o `link_checkout` real do oferta.md.
+
 ```json
 {
   "hero": {
@@ -69,7 +71,7 @@ Qualquer bloco pode ter `"ativo": false` pra ficar escondido. Trechos da headlin
       "itens": ["Ebook de receitas", "Vídeos curtos", "Todos os bônus"],
       "precoDe": "",
       "precoPor": "R$ 27",
-      "checkoutUrl": "https://pay.kiwify.com.br/abc123",
+      "checkoutUrl": "",
       "cta": "QUERO MEU ACESSO"
     },
     "premium": { "ativo": false }

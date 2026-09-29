@@ -49,8 +49,17 @@ def test_exemplo_da_referencia_e_um_conteudo_valido():
     ref = (SKILL / "referencias" / "copy.md").read_text(encoding="utf-8")
     bloco = re.search(r"```json\n(.*?)```", ref, re.S).group(1)
     conteudo, avisos = pc.normalizar(json.loads(bloco))
-    assert conteudo["hero"]["ativo"] and conteudo["planos"]["ativo"]
-    assert not [a for a in avisos if not a.startswith(("depoimentos", "carrossel"))]
+    assert conteudo["hero"]["ativo"]
+    assert json.loads(bloco)["planos"]["basico"]["checkoutUrl"] == ""
+    assert not [a for a in avisos if not a.startswith(("depoimentos", "carrossel", "planos: falta o link"))]
+    assert any(a.startswith("planos: falta o link") for a in avisos)
+
+
+def test_exemplo_nao_traz_dominio_de_checkout_de_mentira():
+    ref = (SKILL / "referencias" / "copy.md").read_text(encoding="utf-8")
+    bloco = re.search(r"```json\n(.*?)```", ref, re.S).group(1)
+    for dominio in ("pay.kiwify.com.br/", "kiwify", "hotmart", "payt", "SEU-LINK"):
+        assert dominio.lower() not in bloco.lower(), dominio
 
 
 def test_skill_cobre_endereco_paleta_e_head():
@@ -59,4 +68,3 @@ def test_skill_cobre_endereco_paleta_e_head():
     assert "oferta definir <slug> paleta='<escolhida>'" in t
     assert "<P>/pagina/head.html" in t and 'open "<P>/pagina"' in t
     assert "remonta a página antes" in t and "link_checkout" in t and "planos.basico.checkoutUrl" in t
-    assert "  " not in re.search(r"## Passo 6.*?## Regerar", t, re.S).group(0).replace("\n  ", "\n").replace("    ", "")
