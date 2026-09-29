@@ -25,9 +25,11 @@ O Homebrew é uma loja de programas para o Mac. Acesse [brew.sh](https://brew.sh
 
 > **Atenção:** o Homebrew vai pedir a senha do seu Mac. Ao digitar, nada aparece na tela (nem bolinhas). É normal. Digite a senha e aperte Enter.
 
+> **Atenção:** antes do Homebrew, o Mac pode instalar as Ferramentas de Linha de Comando (Xcode Command Line Tools). Vai aparecer uma janela pedindo para instalar: aceite. Pode levar de 10 a 30 minutos. É normal demorar.
+
 ## Passo 2: instalar o Python
 
-Com o Homebrew pronto, cole este comando no Terminal e aperte Enter:
+Quando o Homebrew terminar, ele mostra no final umas linhas chamadas "Next steps". Rode essas linhas (no Mac com chip Apple, é `eval "$(/opt/homebrew/bin/brew shellenv)"`) ou, mais simples, feche o Terminal e abra um novo. Depois cole este comando e aperte Enter:
 
 `brew install python@3.12`
 
@@ -41,7 +43,10 @@ Espere terminar (alguns minutos). Quando o cursor voltar a piscar, o Python est�
 2. Abra a pasta e dê dois cliques em **Instalar Máquina.command**.
 3. Vai abrir uma janela do Terminal e a instalação começa.
 
-> **Atenção:** na primeira vez, o Mac pode dizer que o arquivo não pode ser aberto porque vem de um desenvolvedor não identificado. Não é vírus. Clique com o **botão direito** no arquivo, escolha **Abrir** e, na janela que aparecer, clique em **Abrir** de novo.
+> **Atenção:** na primeira vez, o Mac pode bloquear o arquivo dizendo que não conseguiu verificar o desenvolvedor. Não é vírus. Faça assim:
+
+- **macOS 15 (Sequoia) ou mais novo:** dê dois cliques, feche o aviso ("A Apple não pôde verificar..."), abra **Ajustes do Sistema**, entre em **Privacidade e Segurança**, role até o fim e clique em **Abrir Mesmo Assim** ao lado de "Instalar Máquina.command". Confirme com a senha do Mac.
+- **macOS mais antigo:** clique com o **botão direito** no arquivo, escolha **Abrir** e, na janela que aparecer, clique em **Abrir** de novo.
 
 ## O que aparece na janela
 
@@ -119,8 +124,9 @@ Se algo der errado, procure a mensagem na tabela. Na maioria das vezes, rodar o 
 | maquina: command not found | Feche o Terminal e abra um novo. Se continuar, digite `~/.local/bin/maquina` no lugar de `maquina`. |
 | A Máquina não está instalada direito | Rode o instalador de novo (dois cliques em Instalar Máquina.command). |
 | Chave recusada | Confira se copiou a chave inteira, sem espaço no começo ou no fim. Depois digite `maquina chaves` e cole de novo. |
-| O Mac não deixa abrir o instalador | Botão direito no arquivo, **Abrir**, e **Abrir** de novo. |
+| O Mac não deixa abrir o instalador | macOS 15 (Sequoia) ou mais novo: feche o aviso, vá em Ajustes do Sistema, Privacidade e Segurança, role até o fim e clique em **Abrir Mesmo Assim**. macOS mais antigo: botão direito no arquivo, **Abrir**, e **Abrir** de novo. |
+| brew: command not found | Feche o Terminal e abra um novo. Se continuar, rode as linhas "Next steps" que o Homebrew mostrou no final da instalação (no Mac com chip Apple: `eval "$(/opt/homebrew/bin/brew shellenv)"`) e tente de novo. |
 
 ## Pedindo ajuda ao suporte
 
-Se nada resolver, mande ao suporte um print da janela do Terminal e o arquivo de registro técnico, que fica em `~/.maquina/log/maquina.log`. Com essas duas coisas fica muito mais rápido descobrir o problema.
+Se nada resolver, mande ao suporte um print da janela do Terminal e os arquivos de registro técnico: se a falha foi durante a instalação, `~/.maquina/log/instalacao.log`; se foi em outro momento, `~/.maquina/log/maquina.log`. Com essas duas coisas fica muito mais rápido descobrir o problema.

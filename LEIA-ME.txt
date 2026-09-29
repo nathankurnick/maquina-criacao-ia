@@ -2,8 +2,11 @@ MÁQUINA CRIAÇÃO IA
 
 Pra instalar:
   1. Dê dois cliques em "Instalar Máquina.command".
-     Se o Mac disser que não pode abrir (desenvolvedor não identificado):
-     clique com o botão direito no arquivo → Abrir → Abrir.
+     Se o Mac bloquear o arquivo:
+     - macOS 15 (Sequoia) ou mais novo: dê dois cliques, feche o aviso ("A Apple não pôde
+       verificar..."), abra Ajustes do Sistema → Privacidade e Segurança, role até o fim e
+       clique em "Abrir Mesmo Assim" ao lado de "Instalar Máquina.command"; confirme com a senha.
+     - macOS mais antigo: botão direito no arquivo → Abrir → Abrir.
   2. Siga as mensagens na janela do Terminal (leva alguns minutos).
   3. Abra um Terminal novo, digite claude e use os sistemas:
      /01-pesquisa-ofertas  /02-pagina-de-vendas  /03-entregaveis  /04-anuncios  /05-funil

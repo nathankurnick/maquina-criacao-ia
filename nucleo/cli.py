@@ -29,7 +29,10 @@ def _atualizar(a) -> int:
           "Pra atualizar a Máquina:\n"
           "  1. Baixe o zip da versão nova na área de membros do curso.\n"
           "  2. Descompacte (dois cliques no arquivo .zip).\n"
-          '  3. Dê dois cliques em "Instalar Máquina.command" (se o Mac bloquear: botão direito → Abrir).\n'
+          '  3. Dê dois cliques em "Instalar Máquina.command" (se o Mac bloquear, veja abaixo).\n'
+          "     macOS 15 (Sequoia) ou mais novo: feche o aviso, abra Ajustes do Sistema → Privacidade e Segurança,\n"
+          "     role até o fim e clique em 'Abrir Mesmo Assim' ao lado do arquivo; confirme com a senha.\n"
+          "     macOS mais antigo: botão direito no arquivo → Abrir → Abrir.\n"
           "Suas chaves e seus projetos continuam onde estão. Depois, feche e abra o Claude de novo.")
     return 0
 

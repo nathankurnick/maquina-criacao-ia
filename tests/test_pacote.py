@@ -35,6 +35,7 @@ def test_command_roda_o_instalador_da_propria_pasta(tmp_path):
 def test_leia_me():
     texto = (RAIZ / "LEIA-ME.txt").read_text(encoding="utf-8")
     assert "Instalar Máquina.command" in texto and "COMO-INSTALAR.pdf" in texto
+    assert "Privacidade e Segurança" in texto and "Abrir Mesmo Assim" in texto
     assert "botão direito" in texto and "Abrir" in texto
 
 

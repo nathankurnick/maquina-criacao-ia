@@ -17,6 +17,7 @@ for arg in "$@"; do
   esac
 done
 
+PY="$RAIZ/.venv/bin/python"; [ -x "$PY" ] || PY=python3
 falhar() { echo "❌ $1" >&2; exit 1; }
 
 rm -rf "$DIST/pacote" "$ZIP"
@@ -37,11 +38,12 @@ if [ "$COM_PDF" = "1" ]; then
   cp "$TMP/como-instalar/como-instalar.pdf" "$PACOTE/COMO-INSTALAR.pdf"
 fi
 
+[ "$COM_PDF" = "1" ] || echo "⚠️ Pacote sem o COMO-INSTALAR.pdf (só pra teste)"
 chmod +x "$PACOTE/instalar.sh" "$PACOTE/Instalar Máquina.command" "$PACOTE/bin/maquina"
 
 # Python (e não o comando zip) pra gravar os nomes em UTF-8 — "Instalar Máquina.command" tem acento —
 # guardando as permissões Unix de cada arquivo.
-python3 - "$DIST/pacote" "$NOME" "$ZIP" <<'PY'
+"$PY" - "$DIST/pacote" "$NOME" "$ZIP" <<'PY'
 import os, sys, unicodedata, zipfile
 base, nome, destino = sys.argv[1:4]
 with zipfile.ZipFile(destino, "w", zipfile.ZIP_DEFLATED) as z:
@@ -61,7 +63,7 @@ with zipfile.ZipFile(destino, "w", zipfile.ZIP_DEFLATED) as z:
                     z.writestr(info, f.read())
 PY
 
-PROIBIDOS="$(python3 -c 'import sys,zipfile; print("\n".join(zipfile.ZipFile(sys.argv[1]).namelist()))' "$ZIP" | grep -E '(^|/)(tests|\.venv|__pycache__|dev|docs-aluno|log|\.pytest_cache)(/|$)|\.DS_Store|requirements-dev\.txt|pytest\.ini' || true)"
+PROIBIDOS="$("$PY" -c 'import sys,zipfile; print("\n".join(zipfile.ZipFile(sys.argv[1]).namelist()))' "$ZIP" | grep -E '(^|/)(tests|\.venv|__pycache__|dev|docs-aluno|log|\.pytest_cache)(/|$)|\.DS_Store|requirements-dev\.txt|pytest\.ini|(^|/)\.env$|(^|/)chaves\.env$|\.log$' || true)"
 if [ -n "$PROIBIDOS" ]; then
   rm -f "$ZIP"
   falhar "O zip ficou com arquivos que não podem ir pro aluno: $PROIBIDOS"
