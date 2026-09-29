@@ -6,11 +6,12 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parent.parent
 
 
-def _rodar(tmp_path, com_claude=True):
+def _rodar(tmp_path, com_claude=True, com_python=True, args=("--sem-chaves",), stdin=None):
     binfake = tmp_path / "binfake"
     binfake.mkdir(exist_ok=True)
     (binfake / "python3.12").unlink(missing_ok=True)
-    (binfake / "python3.12").symlink_to(sys.executable)
+    if com_python:
+        (binfake / "python3.12").symlink_to(sys.executable)
     claude = binfake / "claude"
     if com_claude:
         claude.write_text("#!/bin/sh\nexit 0\n")
@@ -25,9 +26,12 @@ def _rodar(tmp_path, com_claude=True):
         "MAQUINA_BIN": str(home / "bin"),
         "CLAUDE_SKILLS_DIR": str(home / ".claude" / "skills"),
         "MAQUINA_PULAR_DEPS": "1",
+        "MAQUINA_PY_DIRS": "",
     }
-    r = subprocess.run(["bash", str(RAIZ / "instalar.sh"), "--sem-chaves"],
-                       env=env, capture_output=True, text=True)
+    r = subprocess.run(["bash", str(RAIZ / "instalar.sh"), *args],
+                       env=env, capture_output=True, text=True,
+                       stdin=subprocess.DEVNULL if stdin is None else None,
+                       input=stdin)
     return r, home, env
 
 
@@ -59,7 +63,7 @@ def test_reinstalar_preserva_chaves(tmp_path):
 
 def test_copia_skills_com_skill_md(tmp_path):
     skill = RAIZ / "skills" / "zz-teste"
-    skill.mkdir()
+    skill.mkdir(parents=True, exist_ok=True)
     try:
         (skill / "SKILL.md").write_text("---\nname: zz-teste\n---\n")
         _, home, _ = _rodar(tmp_path)
@@ -67,3 +71,46 @@ def test_copia_skills_com_skill_md(tmp_path):
     finally:
         (skill / "SKILL.md").unlink()
         skill.rmdir()
+
+
+def test_chaves_falhando_nao_derruba_instalacao(tmp_path):
+    r, _, _ = _rodar(tmp_path, args=())
+    assert r.returncode == 0, r.stderr
+    assert "instalada" in r.stdout
+    assert "maquina chaves" in r.stdout + r.stderr
+
+
+def test_sem_python_moderno_para_com_mensagem(tmp_path):
+    r, _, _ = _rodar(tmp_path, com_python=False)
+    assert r.returncode == 1
+    assert "Python 3.10" in r.stderr
+
+
+def test_opcao_desconhecida_avisa_e_continua(tmp_path):
+    r, _, _ = _rodar(tmp_path, args=("--sem-chaves", "--foo"))
+    assert r.returncode == 0, r.stderr
+    assert "Opção desconhecida: --foo" in r.stderr
+
+
+def test_venv_velho_e_recriado(tmp_path):
+    _, home, _ = _rodar(tmp_path)
+    py = home / ".maquina" / "venv" / "bin" / "python"
+    py.unlink()
+    py.write_text("#!/bin/sh\nexit 1\n")
+    py.chmod(0o755)
+    r, _, _ = _rodar(tmp_path)
+    assert r.returncode == 0, r.stderr
+    ok = subprocess.run([str(py), "-c", "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)"])
+    assert ok.returncode == 0
+
+
+def test_reinstalar_duas_vezes_uma_linha_no_zshrc_e_preserva_projetos(tmp_path):
+    _, home, _ = _rodar(tmp_path)
+    proj = home / "MaquinaIA" / "x"
+    proj.mkdir(parents=True)
+    (proj / "arq.txt").write_text("oi")
+    r, _, _ = _rodar(tmp_path)
+    assert r.returncode == 0, r.stderr
+    zshrc = (home / ".zshrc").read_text()
+    assert zshrc.count("MAQUINA_BIN_PATH") == 1
+    assert (proj / "arq.txt").read_text() == "oi"
