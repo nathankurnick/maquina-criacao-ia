@@ -48,7 +48,7 @@ preco, entregaveis[], bonus[], garantia, link_checkout, paleta` + corpo livre.
   `scripts/` no mesmo namespace de import). Nomes já usados pela skill 01: `coleta`, `raspar`,
   `ofertas`, `capturar`, `baixar_criativos`, `registrar_escolha`. Skill 02 (Sistema 02): `pagina_conteudo`,
   `pagina_render`, `pagina_config`, `pagina_publicar`. Skill 03 (Sistema 03): `entregavel_md`,
-  `entregavel_pdf`, `entregavel_capa`, `entregavel_planilha`. Skill 04 (Sistema 04): `anuncio_dados`, `anuncio_riscos`, `anuncio_criativo`, `anuncio_exportar`. Skill nova: prefixe ou escolha nomes
+  `entregavel_pdf`, `entregavel_capa`, `entregavel_planilha`. Skill 04 (Sistema 04): `anuncio_dados`, `anuncio_riscos`, `anuncio_criativo`, `anuncio_exportar`. Skill 05 (Sistema 05): `funil_dados`, `funil_mapa`, `funil_oto`. Skill nova: prefixe ou escolha nomes
   diferentes destes e, se criar outra pasta `scripts/`, adicione-a ao `pythonpath` do `pytest.ini`.
 - Detalhe técnico de erro (traceback) vai para `${MAQUINA_HOME:-~/.maquina}/log/maquina.log`; o
   aluno só vê a mensagem amigável.
