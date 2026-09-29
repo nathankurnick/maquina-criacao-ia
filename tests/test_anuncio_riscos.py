@@ -51,3 +51,40 @@ def test_main_imprime_e_sai_0(tmp_path, capsys):
     assert "a:" in out and "antes e depois" in out.lower() and "b: nenhum aviso" in out.lower()
     assert ar.main(["--pasta", str(tmp_path / "nada")]) == 1
     assert ar.main([]) == 1
+
+
+@pytest.mark.parametrize("texto", [
+    "Perca 5kg em 21 dias", "Perca 5 kg em 21 dias", "Você está com sobrepeso?", "Você tem diabetes?",
+    "Você sofre de diabetes há anos", "Cure a ansiedade", "dinheiro garantido", "Voce e gordo", "Voce esta acima do peso",
+    "Mulheres acima dos 40 anos", "Faturei 30 mil por mês",
+])
+def test_recall(texto):
+    assert ar.avaliar(_a(texto_principal=texto)), texto
+
+
+@pytest.mark.parametrize("texto", [
+    "Aprenda a cozinhar em 7 dias", "Ganhe tempo", "Ganhe 10% de desconto", "Você tem filhos pequenos?",
+    "Renda extra", "A cura para o tédio", "Você é capaz", "Antes de começar, depois de comprar",
+    "cardápio garantido", "Perca o medo em 4 semanas", "Mulheres com mais de 40 anos de experiência",
+    "Elimine a bagunça em 3 dias", "Tudo garantido: entrega rápida",
+    "Você é capaz de cozinhar em 20 minutos com estas receitas.",
+    "Renda extra: o guia mostra 10 ideias e custa R$ 47.",
+])
+def test_sem_falso_positivo(texto):
+    assert ar.avaliar(_a(texto_principal=texto)) == [], texto
+
+
+def test_argparse_em_portugues(capsys):
+    assert ar.main([]) == 1
+    err = capsys.readouterr().err
+    assert "falta --pasta" in err and "required" not in err
+    assert ar.main(["--xyz"]) == 1
+    assert "the " not in capsys.readouterr().err
+
+
+def test_ctrl_c(monkeypatch, capsys):
+    def boom(_):
+        raise KeyboardInterrupt
+    monkeypatch.setattr(ar, "ler_anuncios", boom)
+    assert ar.main(["--pasta", "x"]) == 130
+    assert "Cancelado." in capsys.readouterr().err

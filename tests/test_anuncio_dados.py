@@ -69,3 +69,20 @@ def test_destino_e_paleta(tmp_path):
     assert ad.paleta_do_projeto(tmp_path) == "preto-dourado"
     (tmp_path / "pagina" / "config.json").write_text("{quebrado")
     assert ad.destino(tmp_path) == "" and ad.paleta_do_projeto(tmp_path) == ""
+
+
+def test_hooks_e_cenas_string_viram_lista(tmp_path):
+    (v,) = ad.ler_anuncios(_gravar(tmp_path, [_video(hooks="Um só hook", cenas="uma cena")]))
+    assert v["hooks"] == ["Um só hook"] and v["cenas"] == ["uma cena"]
+
+
+@pytest.mark.parametrize("campo", ["hooks", "cenas"])
+def test_hooks_cenas_tipo_errado(tmp_path, campo):
+    with pytest.raises(ValueError, match=f"{campo} precisa ser uma lista de textos"):
+        ad.ler_anuncios(_gravar(tmp_path, [_video(**{campo: {"a": 1}})]))
+
+
+def test_arquivo_ilegivel(tmp_path):
+    (tmp_path / "anuncios.json").mkdir()
+    with pytest.raises(ValueError, match="Não consegui ler"):
+        ad.ler_anuncios(tmp_path)

@@ -18,6 +18,17 @@ def _txt(v) -> str:
     return v.strip() if isinstance(v, str) else ""
 
 
+def _lista(bruto: dict, campo: str, onde: str) -> list:
+    v = bruto.get(campo)
+    if v is None:
+        return []
+    if isinstance(v, str):
+        v = [v]
+    if not isinstance(v, list):
+        raise ValueError(f"{onde}: {campo} precisa ser uma lista de textos.")
+    return [c.strip() for c in v if isinstance(c, str) and c.strip()]
+
+
 def _obrigatorio(bruto: dict, campo: str, onde: str) -> str:
     valor = _txt(bruto.get(campo))
     if not valor:
@@ -50,12 +61,12 @@ def _normalizar(bruto, posicao: int) -> dict:
         a["visual"] = {"prompt": _txt(visual.get("prompt")), "produto": _slug(_txt(visual.get("produto"))),
                        "layout": layout}
     else:
-        hooks = [h.strip() for h in bruto.get("hooks") or [] if isinstance(h, str) and h.strip()]
+        hooks = _lista(bruto, "hooks", onde)
         if not hooks:
             raise ValueError(f"{onde}: o vídeo precisa de pelo menos 1 texto em hooks.")
         a.update(hooks=hooks, corpo=_obrigatorio(bruto, "corpo", onde),
                  cta_falado=_obrigatorio(bruto, "cta_falado", onde),
-                 cenas=[c.strip() for c in bruto.get("cenas") or [] if isinstance(c, str) and c.strip()])
+                 cenas=_lista(bruto, "cenas", onde))
     return a
 
 
@@ -67,7 +78,9 @@ def ler_anuncios(pasta_anuncios: Path) -> list[dict]:
         raise ValueError(f"Não achei {arq}. Escreva os anúncios antes.") from err
     except UnicodeDecodeError as err:
         raise ValueError(f"O {arq} não está em UTF-8. Salve como UTF-8.") from err
-    except (OSError, ValueError) as err:
+    except OSError as err:
+        raise ValueError(f"Não consegui ler o {arq} ({type(err).__name__}). Confira se é um arquivo e se você tem permissão.") from err
+    except ValueError as err:
         raise ValueError(f"O {arq} tem um erro de formatação ({type(err).__name__}).") from err
     lista = dados.get("anuncios") if isinstance(dados, dict) else None
     if not isinstance(lista, list) or not lista:
