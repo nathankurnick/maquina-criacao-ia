@@ -80,10 +80,11 @@ Se falhar, a mensagem em português diz o motivo. Os detalhes técnicos ficam em
 ## 5. Conferir
 
 ```bash
-~/.local/bin/maquina status
+~/.local/bin/maquina versao; ~/.local/bin/maquina status; ls ~/.claude/skills | grep -E '^0[1-5]-'
 ```
 
-Deve mostrar a versão e as 5 skills. As chaves ainda aparecem como não configuradas, e isso é esperado.
+Deve mostrar a versão, as duas chaves (ainda não configuradas, e isso é esperado) e as 5 pastas de
+skill, de `01-pesquisa-ofertas` a `05-funil`.
 
 ## 6. Chaves de API (opcionais)
 
