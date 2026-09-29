@@ -7,7 +7,7 @@ body{background:transparent}
 .topo .veu{background:linear-gradient(0deg,rgba(0,0,0,0) 35%,rgba(0,0,0,.78) 100%)}
 .centro .veu{background:rgba(0,0,0,.55)}
 .produto{position:relative;flex:1;display:flex;align-items:center;justify-content:center;min-height:0}
-.produto img{max-width:78%;max-height:100%;object-fit:contain;filter:drop-shadow(0 24px 40px rgba(0,0,0,.45))}
+.produto img{max-width:92%;max-height:100%;object-fit:contain;filter:drop-shadow(0 24px 40px rgba(0,0,0,.45))}
 .texto{position:relative}
 .base .texto{margin-top:auto}
 .centro{justify-content:center;text-align:center}
@@ -18,6 +18,8 @@ body{background:transparent}
 .h-curta{font-size:104px}
 .h-media{font-size:84px}
 .h-longa{font-size:64px}
+.f9x16{padding:270px 72px 380px}
+.f9x16 .produto img{max-width:100%}
 .f9x16 .h-curta{font-size:120px}
 .f9x16 .h-media{font-size:96px}
 .f9x16 .h-longa{font-size:74px}

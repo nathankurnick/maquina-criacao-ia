@@ -91,3 +91,8 @@ def test_compor_de_verdade(tmp_path):
     dados = (p / "anuncios" / "criativos" / "dor-9x16.jpg").read_bytes()
     assert dados[:3] == b"\xff\xd8\xff"
     assert not [x for x in (p / "anuncios" / "criativos").iterdir() if x.name.startswith(".")]
+
+
+def test_9x16_tem_zonas_seguras():
+    h = ac.html_criativo(_anuncio(), "9x16", "azul-laranja")
+    assert "quadro base f9x16" in h and ".f9x16{padding:270px 72px 380px}" in h
