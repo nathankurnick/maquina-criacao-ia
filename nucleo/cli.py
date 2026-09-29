@@ -12,16 +12,28 @@ from nucleo.chaves import (
 from nucleo.erros import MaquinaErro, registrar_log
 
 
-def _versao(a) -> int:
+def _texto_versao() -> str:
     arq = maquina_home() / "VERSION"
     if not arq.exists():
         arq = Path(__file__).resolve().parent.parent / "VERSION"
-    print(arq.read_text().strip() if arq.exists() else "desconhecida")
+    return arq.read_text().strip() if arq.exists() else "desconhecida"
+
+
+def _versao(a) -> int:
+    print(_texto_versao())
     return 0
 
 
 def _status(a) -> int:
     from nucleo.projeto import listar_projetos
+    if a.como_json:
+        import json
+        print(json.dumps({
+            "versao": _texto_versao(),
+            "chaves": {nome: bool(obter_chave(nome)) for nome in CHAVES},
+            "projetos": listar_projetos(),
+        }, ensure_ascii=False))
+        return 0
     print("Chaves:")
     for nome, (servico, uso, _) in CHAVES.items():
         marca = "✅" if obter_chave(nome) else "—"
@@ -79,10 +91,50 @@ def _projeto(a) -> int:
     return 0
 
 
+_ESCALARES = ("nome", "nicho", "avatar", "promessa", "mecanismo", "preco",
+              "garantia", "link_checkout", "paleta")
+_LISTAS = ("entregaveis", "bonus")
+
+
 def _oferta(a) -> int:
-    from nucleo.projeto import Oferta, abrir_projeto, campos_faltando, ler_oferta
-    oferta = ler_oferta(abrir_projeto(a.slug)) or Oferta()
-    print("\n".join(campos_faltando(oferta)))
+    import json
+    from dataclasses import asdict
+    from nucleo.projeto import (
+        Oferta, abrir_projeto, campos_faltando, ler_oferta, salvar_oferta,
+    )
+    pasta = abrir_projeto(a.slug)
+    oferta = ler_oferta(pasta) or Oferta()
+    if a.acao == "faltando":
+        print("\n".join(campos_faltando(oferta)))
+    elif a.acao == "mostrar":
+        print(json.dumps(asdict(oferta), ensure_ascii=False, indent=2))
+    elif a.acao == "definir":
+        if not a.extra:
+            raise MaquinaErro("Faltou o que definir. Exemplo: maquina oferta definir "
+                              f'{a.slug} nome="Meu Produto" preco=47')
+        novos = {}
+        for par in a.extra:
+            campo, igual, valor = par.partition("=")
+            campo = campo.strip()
+            if not igual:
+                raise MaquinaErro(f'"{par}" não está no formato campo=valor.')
+            if campo in _LISTAS:
+                raise MaquinaErro(f'"{campo}" é uma lista. Use: maquina oferta adicionar '
+                                  f'{a.slug} {campo} "<item>"')
+            if campo not in _ESCALARES:
+                raise MaquinaErro(f'Campo desconhecido: "{campo}". Campos: {", ".join(_ESCALARES)}')
+            novos[campo] = valor.strip()
+        for campo, valor in novos.items():
+            setattr(oferta, campo, valor)
+        salvar_oferta(pasta, oferta)
+    elif a.acao == "adicionar":
+        if len(a.extra) != 2 or a.extra[0] not in _LISTAS or not a.extra[1].strip():
+            raise MaquinaErro(f'Use: maquina oferta adicionar {a.slug} <entregaveis|bonus> "<item>"')
+        lista, item = a.extra[0], a.extra[1].strip()
+        atual = getattr(oferta, lista)
+        if item not in atual:
+            atual.append(item)
+        salvar_oferta(pasta, oferta)
     return 0
 
 
@@ -97,15 +149,18 @@ def _parser() -> argparse.ArgumentParser:
     p = _Parser(prog="maquina", description="Máquina Criação IA")
     sub = p.add_subparsers(dest="comando", required=True)
     sub.add_parser("versao").set_defaults(func=_versao)
-    sub.add_parser("status").set_defaults(func=_status)
+    st = sub.add_parser("status")
+    st.add_argument("--json", action="store_true", dest="como_json")
+    st.set_defaults(func=_status)
     sub.add_parser("chaves").set_defaults(func=_chaves)
     pr = sub.add_parser("projeto")
     pr.add_argument("acao", choices=["novo", "listar", "caminho"])
     pr.add_argument("valor", nargs="?", default="")
     pr.set_defaults(func=lambda a: _projeto(a))
     of = sub.add_parser("oferta")
-    of.add_argument("acao", choices=["faltando"])
+    of.add_argument("acao", choices=["faltando", "definir", "adicionar", "mostrar"])
     of.add_argument("slug")
+    of.add_argument("extra", nargs="*", default=[])
     of.set_defaults(func=_oferta)
     return p
 

@@ -86,3 +86,12 @@ def test_ler_oferta_com_bytes_invalidos_da_erro_amigavel(ambiente):
     (pasta / "oferta.md").write_bytes(b"---\nnome: \xff\xfe\n---\n")
     with pytest.raises(MaquinaErro, match="oferta.md"):
         ler_oferta(pasta)
+
+
+@pytest.mark.parametrize("valor", ["#1a2b3c", "Perca 5kg: em 21 dias", "47.90", "R$ 47", "sim", "null",
+                                   "123", "a: b # c", "'aspas'", "- item", "é ção", "true"])
+def test_salvar_oferta_ida_e_volta_exata(ambiente, valor):
+    pasta = criar_projeto("rt")
+    salvar_oferta(pasta, Oferta(paleta=valor, preco=valor, promessa=valor, bonus=[valor], corpo="corpo"))
+    o = ler_oferta(pasta)
+    assert (o.paleta, o.preco, o.promessa, o.bonus, o.corpo) == (valor, valor, valor, [valor], "corpo")

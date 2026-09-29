@@ -108,3 +108,88 @@ def test_argparse_erro_em_portugues(ambiente, capsys):
     err = capsys.readouterr().err
     assert "Comando inválido" in err and "maquina --help" in err
     assert "usage:" not in err
+
+
+def _oferta_definir(*campos, slug="p"):
+    return cli.main(["oferta", "definir", slug, *campos])
+
+
+def test_oferta_definir_cria_arquivo_e_divide_no_primeiro_igual(ambiente, capsys):
+    from nucleo.projeto import abrir_projeto, criar_projeto, ler_oferta
+    criar_projeto("p")
+    assert _oferta_definir("nome=Barriga Leve", "promessa=Perca 5kg: em 21 dias=ou menos",
+                           "paleta=#1a2b3c", "preco=47.90") == 0
+    o = ler_oferta(abrir_projeto("p"))
+    assert (o.nome, o.promessa, o.paleta, o.preco) == (
+        "Barriga Leve", "Perca 5kg: em 21 dias=ou menos", "#1a2b3c", "47.90")
+
+
+def test_oferta_definir_preserva_corpo_e_listas(ambiente):
+    from nucleo.projeto import Oferta, abrir_projeto, criar_projeto, ler_oferta, salvar_oferta
+    pasta = criar_projeto("p")
+    salvar_oferta(pasta, Oferta(nome="A", bonus=["b1"], entregaveis=["e1", "e2"], corpo="texto livre"))
+    assert _oferta_definir("nicho=saúde") == 0
+    o = ler_oferta(pasta)
+    assert (o.nome, o.nicho, o.bonus, o.entregaveis, o.corpo) == ("A", "saúde", ["b1"], ["e1", "e2"], "texto livre")
+
+
+def test_oferta_definir_campo_desconhecido_ou_lista(ambiente, capsys):
+    from nucleo.projeto import criar_projeto
+    criar_projeto("p")
+    for campo in ("foo=1", "bonus=x", "entregaveis=y", "corpo=z", "semigual"):
+        assert _oferta_definir(campo) == 1
+    err = capsys.readouterr().err
+    assert err.count("❌") == 5 and "Traceback" not in err
+    assert "maquina oferta adicionar" in err
+
+
+def test_oferta_definir_projeto_invalido(ambiente, capsys):
+    assert _oferta_definir("nome=x", slug="../x") == 1
+    assert "inválido" in capsys.readouterr().err
+
+
+def test_oferta_adicionar_sem_duplicar(ambiente):
+    from nucleo.projeto import abrir_projeto, criar_projeto, ler_oferta
+    criar_projeto("p")
+    for item in ("Guia", "Planilha", "Guia"):
+        assert cli.main(["oferta", "adicionar", "p", "entregaveis", item]) == 0
+    assert cli.main(["oferta", "adicionar", "p", "bonus", "Extra"]) == 0
+    o = ler_oferta(abrir_projeto("p"))
+    assert o.entregaveis == ["Guia", "Planilha"] and o.bonus == ["Extra"]
+
+
+def test_oferta_adicionar_lista_invalida(ambiente, capsys):
+    from nucleo.projeto import criar_projeto
+    criar_projeto("p")
+    assert cli.main(["oferta", "adicionar", "p", "nome", "x"]) == 1
+    assert "entregaveis" in capsys.readouterr().err
+
+
+def test_oferta_mostrar_json(ambiente, capsys):
+    import json
+    from nucleo.projeto import Oferta, criar_projeto, salvar_oferta
+    pasta = criar_projeto("p")
+    salvar_oferta(pasta, Oferta(nome="A", bonus=["b"], corpo="livre"))
+    assert cli.main(["oferta", "mostrar", "p"]) == 0
+    d = json.loads(capsys.readouterr().out)
+    assert d["nome"] == "A" and d["bonus"] == ["b"] and d["corpo"] == "livre" and d["preco"] == ""
+    assert len(d) == 12
+
+
+def test_oferta_mostrar_sem_arquivo_vazio(ambiente, capsys):
+    import json
+    from nucleo.projeto import criar_projeto
+    criar_projeto("p")
+    assert cli.main(["oferta", "mostrar", "p"]) == 0
+    assert json.loads(capsys.readouterr().out)["nome"] == ""
+
+
+def test_status_json(ambiente, capsys, monkeypatch):
+    import json
+    from nucleo.projeto import criar_projeto
+    criar_projeto("p")
+    chaves.salvar_chave("KIE_API_KEY", "k")
+    assert cli.main(["status", "--json"]) == 0
+    d = json.loads(capsys.readouterr().out)
+    assert d["chaves"] == {"KIE_API_KEY": True, "NETLIFY_TOKEN": False}
+    assert d["projetos"] == ["p"] and "versao" in d
