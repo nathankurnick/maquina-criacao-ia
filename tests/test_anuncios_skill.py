@@ -60,3 +60,10 @@ def test_exemplo_do_anuncios_json_na_referencia_e_valido(tmp_path):
     (tmp_path / "anuncios.json").write_text(exemplo, encoding="utf-8")
     anuncios = anuncio_dados.ler_anuncios(tmp_path)
     assert {a["formato"] for a in anuncios} == {"estatico", "video"}
+
+
+def test_skill_pontos_da_revisao_final():
+    s = (SKILL / "SKILL.md").read_text(encoding="utf-8")
+    for trecho in ("pagina/conteudo.json", "pesquisa/oferta-*/dissecacao.md", "<AAAA-MM-DD>-<nicho-em-slug>",
+                   'ls "<P>"/entregaveis/*/mockup.png', "só gera o que falta", "rode o exportar de novo"):
+        assert trecho in s, trecho

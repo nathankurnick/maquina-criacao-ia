@@ -61,7 +61,7 @@ def test_exportar_cai_pra_csv_sem_o_03(tmp_path, monkeypatch):
     monkeypatch.setattr(ae, "gerar_xlsx", None)
     r = ae.exportar(p)
     assert r["plano"].suffix == ".csv"
-    linhas = list(csv.reader(r["plano"].open(encoding="utf-8-sig")))
+    linhas = list(csv.reader(r["plano"].open(encoding="utf-8-sig"), delimiter=";"))
     assert linhas[0][0] == "Anúncio" and len(linhas) == 4
 
 
