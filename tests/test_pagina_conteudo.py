@@ -1,4 +1,3 @@
-import json
 import stat
 
 import pytest
@@ -122,3 +121,45 @@ def test_validar_valor_ok(chave, valor, esperado):
 def test_validar_valor_recusa(chave, valor):
     with pytest.raises(ValueError):
         pc.validar_valor(chave, valor)
+
+
+def test_icone_lista_ou_dict_cai_no_padrao():
+    bruto = _completo()
+    bruto["conteudo"]["itens"] = [{"icone": ["x"], "titulo": "A"}, {"icone": {"a": 1}, "titulo": "B"}]
+    c, _ = pc.normalizar(bruto)
+    assert [i["icone"] for i in c["conteudo"]["itens"]] == ["estrela", "estrela"]
+
+
+def test_dias_string_numerica_e_invalido_com_aviso():
+    for bruto_dias, esperado in (("10", 10), (" 30 ", 30)):
+        bruto = _completo()
+        bruto["garantia"]["dias"] = bruto_dias
+        c, avisos = pc.normalizar(bruto)
+        assert c["garantia"]["dias"] == esperado and avisos == []
+    bruto = _completo()
+    bruto["garantia"]["dias"] = "sete"
+    c, avisos = pc.normalizar(bruto)
+    assert c["garantia"]["dias"] == 7
+    assert "garantia: dias inválido — usei 7." in avisos
+
+
+def test_preco_numerico_vira_texto():
+    bruto = _completo()
+    bruto["planos"]["basico"]["precoPor"] = 97
+    bruto["planos"]["basico"]["precoDe"] = 197.5
+    bruto["bonus"]["itens"][0]["valor"] = 47
+    c, _ = pc.normalizar(bruto)
+    assert c["planos"]["basico"]["precoPor"] == "97"
+    assert c["planos"]["basico"]["precoDe"] == "197.5"
+    assert c["bonus"]["itens"][0]["valor"] == "47"
+
+
+def test_salvar_config_permissao_644(tmp_path):
+    arq = pc.salvar_config(tmp_path, dict(pc.CONFIG_PADRAO))
+    assert stat.S_IMODE(arq.stat().st_mode) == 0o644
+
+
+@pytest.mark.parametrize("valor", [None, 5, ["a"]])
+def test_validar_valor_nao_texto(valor):
+    with pytest.raises(ValueError, match="texto"):
+        pc.validar_valor("paleta", valor)

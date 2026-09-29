@@ -79,11 +79,19 @@ def _texto(v, padrao: str = "") -> str:
     return padrao
 
 
+def _preco(v) -> str:
+    if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v):
+        return str(int(v)) if float(v).is_integer() else str(v)
+    return _texto(v)
+
+
 def _bool(v, padrao: bool) -> bool:
     return v if isinstance(v, bool) else padrao
 
 
 def _inteiro(v, padrao: int) -> int:
+    if isinstance(v, str) and re.fullmatch(r"\d+", v.strip()):
+        return int(v.strip())
     if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v):
         return padrao
     return int(v)
@@ -100,8 +108,8 @@ def _plano(v, nome_padrao: str, ativo_padrao: bool, destaque: bool) -> dict:
         "ativo": _bool(o.get("ativo"), ativo_padrao),
         "nome": _texto(o.get("nome"), nome_padrao),
         "itens": [t for t in (_texto(i) for i in _lista(o.get("itens"))) if t],
-        "precoDe": _texto(o.get("precoDe")),
-        "precoPor": _texto(o.get("precoPor")),
+        "precoDe": _preco(o.get("precoDe")),
+        "precoPor": _preco(o.get("precoPor")),
         "checkoutUrl": _texto(o.get("checkoutUrl")),
         "cta": _texto(o.get("cta"), "QUERO ACESSAR AGORA"),
         "destaque": _bool(o.get("destaque"), destaque),
@@ -139,12 +147,12 @@ def normalizar(bruto: object) -> "tuple[dict, list[str]]":
 
     para_quem = com_itens("paraQuem", ("titulo", "subtitulo"), _titulo_descricao)
     conteudo = com_itens("conteudo", ("titulo", "subtitulo"), lambda x: {
-        "icone": _objeto(x).get("icone") if _objeto(x).get("icone") in ICONES else ICONE_PADRAO,
+        "icone": (i if isinstance(i := _objeto(x).get("icone"), str) and i in ICONES else ICONE_PADRAO),
         **_titulo_descricao(x)})
     incluso = com_itens("incluso", ("titulo", "nota"), _titulo_descricao)
     entrega = com_itens("entrega", ("titulo", "subtitulo"), _titulo_descricao)
     bonus = com_itens("bonus", ("titulo", "subtitulo"), lambda x: {
-        **_titulo_descricao(x), "valor": _texto(_objeto(x).get("valor"))})
+        **_titulo_descricao(x), "valor": _preco(_objeto(x).get("valor"))})
 
     d = bloco("depoimentos")
     depoimentos = {"ativo": _bool(d.get("ativo"), True),
@@ -171,6 +179,8 @@ def normalizar(bruto: object) -> "tuple[dict, list[str]]":
                 "titulo": _texto(g.get("titulo"), "GARANTIA INCONDICIONAL"),
                 "dias": _inteiro(g.get("dias"), 7), "texto": _texto(g.get("texto")),
                 "cta": _texto(g.get("cta"), "GARANTIR MEU ACESSO AGORA")}
+    if g.get("dias") is not None and _inteiro(g.get("dias"), -1) < 0:
+        avisos.append("garantia: dias inválido — usei 7.")
     if garantia["ativo"] and not garantia["texto"]:
         garantia["ativo"] = False
         avisos.append("garantia: sem texto — a seção fica escondida.")
@@ -222,6 +232,7 @@ def salvar_config(pasta_pagina: Path, config: dict) -> Path:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(dados, f, ensure_ascii=False, indent=2)
         os.replace(tmp, arq)
+        os.chmod(arq, 0o644)
     finally:
         if os.path.exists(tmp):
             os.unlink(tmp)
@@ -229,6 +240,8 @@ def salvar_config(pasta_pagina: Path, config: dict) -> Path:
 
 
 def validar_valor(chave: str, valor: str) -> str:
+    if not isinstance(valor, str):
+        raise ValueError("O valor precisa ser um texto.")
     v = valor.strip()
     if chave not in CHAVES_EDITAVEIS:
         raise ValueError(f'"{chave}" não pode ser mudado aqui. Use: {", ".join(CHAVES_EDITAVEIS)}.')
