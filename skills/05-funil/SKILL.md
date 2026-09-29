@@ -44,10 +44,12 @@ Pare e espere o aluno escolher. Depois grave `<P>/funil/funil.json` (crie a past
 
 ```json
 {"front":    {"nome": "Marmitas Já", "preco": 27},
- "bump":     {"nome": "Lista de compras inteligente", "preco": 9.9, "conversao": 0.3},
- "upsell":   {"nome": "Cardápio 30 dias", "preco": 67, "conversao": 0.15},
- "downsell": {"nome": "Cardápio 15 dias", "preco": 37, "conversao": 0.15}}
+ "bump":     {"nome": "Lista de compras inteligente", "preco": 9.9, "conversao": 0.2},
+ "upsell":   {"nome": "Cardápio 30 dias", "preco": 67, "conversao": 0.06},
+ "downsell": {"nome": "Cardápio 15 dias", "preco": 37, "conversao": 0.05}}
 ```
+
+Números de exemplo — use as faixas de referência e troque pelos seus quando tiver dados.
 
 Regras dos números (o script confere e rejeita o que não entende):
 
@@ -99,6 +101,8 @@ Página do upsell — escreva `<P>/funil/upsell/oto.json`:
  "recusar_url": "<link da página de downsell ou de obrigado>"}
 ```
 
+- `video`: link do YouTube (watch, youtu.be, /embed/, /shorts/, /live/), link do Vimeo (inclusive
+  privado, com o código depois da barra) ou o código do player (VTurb, Panda…).
 - `pre_headline`, `headline`, `copy_abaixo`, `botao_texto`, `recusar_texto` já vêm com o texto
   do método; só inclua se quiser mudar.
 - `formato: "texto"` + campo `texto` (parágrafos separados por linha em branco) pra upsell em texto.
