@@ -80,3 +80,14 @@ def test_arquivo_ausente_ou_quebrado(tmp_path):
 
 def test_brl():
     assert fd.brl(1234.5) == "R$ 1.234,50" and fd.brl(9.9) == "R$ 9,90" and fd.brl(27) == "R$ 27,00"
+
+
+def test_conversao_um_ambiguo():
+    for ruim in (1, "1"):
+        with pytest.raises(ValueError, match="ambígua"):
+            fd.conversao(ruim, "bump")
+    assert fd.conversao("1%", "bump") == pytest.approx(0.01)
+    assert fd.conversao("100%", "bump") == pytest.approx(1.0)
+    assert fd.conversao(1.0, "bump") == pytest.approx(1.0)
+    assert fd.conversao("0,3", "bump") == pytest.approx(0.3)
+    assert fd.conversao(30, "bump") == pytest.approx(0.3)

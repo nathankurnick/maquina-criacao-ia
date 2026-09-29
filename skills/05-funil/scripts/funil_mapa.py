@@ -39,14 +39,16 @@ def e(t) -> str:
 
 
 def _pct(v: float) -> str:
-    return f"{v * 100:.0f}%"
+    return f"{v * 100:.1f}%".replace(".", ",") if 0 < v < 0.01 else f"{v * 100:.0f}%"
 
 
 def _caixa_oferta(etapa: str, d: dict) -> str:
     baixo, alto = REFERENCIAS[etapa]
+    fora = (' <strong class="fora">⚠️ fora da referência</strong>'
+            if not baixo - 1e-9 <= d["conversao"] <= alto + 1e-9 else "")
     return (f'<div class="caixa oferta"><p class="etapa">{ROTULO[etapa]}</p><p class="nome">{e(d["nome"])}</p>'
             f'<p class="preco">{brl(d["preco"])}</p><p class="conv">Conversão usada: {_pct(d["conversao"])} '
-            f'(referência: {baixo * 100:.0f}–{alto * 100:.0f}%)</p></div>')
+            f'(referência: {baixo * 100:.0f}–{alto * 100:.0f}%){fora}</p></div>')
 
 
 def _caixa(etapa: str, texto: str, extra: str = "") -> str:
@@ -73,9 +75,14 @@ def html_mapa(funil: dict, projecao: dict, paleta_nome: str) -> str:
             partes += [_seta("recusou o upsell"), f'<div class="linha">{_caixa_oferta("downsell", funil["downsell"])}</div>']
     partes += [_seta(), _caixa("Obrigado", "Área de membros", '<p class="conv">Boas-vindas e acesso (mensagens.md)</p>')]
     aumento = projecao["aumento_pct"]
-    selo = "✅ dentro da meta" if aumento >= META_AUMENTO[0] else "⚠️ abaixo da meta"
+    if aumento < META_AUMENTO[0]:
+        selo, fim = "⚠️ abaixo da meta", ""
+    elif aumento <= META_AUMENTO[1]:
+        selo, fim = "✅ dentro da meta", ""
+    else:
+        selo, fim = "✅ acima da meta", " — confira se as conversões não estão otimistas"
     resumo = (f'<div class="resumo"><p class="grande">Ticket médio projetado: <span>{brl(projecao["ticket_medio"])}</span></p>'
-              f'<p>Aumento sobre o produto principal: {aumento:.0f}% — {selo} de {META_AUMENTO[0]:.0f}–{META_AUMENTO[1]:.0f}%</p>'
+              f'<p>Aumento sobre o produto principal: {aumento:.0f}% — {selo} de {META_AUMENTO[0]:.0f}–{META_AUMENTO[1]:.0f}%{fim}</p>'
               '<p class="nota">Conversões são números de referência — troque pelos seus quando tiver dados.</p></div>')
     return (f'<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Mapa do funil</title>'
             f"<style>{variaveis}\n{CSS.read_text(encoding='utf-8')}</style></head><body><div class=\"mapa\">"
@@ -90,6 +97,16 @@ def _paleta_config(pasta_projeto: Path) -> str:
         return ""
 
 
+def _paleta_oferta(pasta_projeto: Path) -> str:
+    try:
+        from nucleo.projeto import ler_oferta
+        o = ler_oferta(pasta_projeto)
+        n = getattr(o, "paleta", "") if o else ""
+        return n if n in PALETAS else ""
+    except Exception:  # noqa: BLE001
+        return ""
+
+
 def gerar(pasta_projeto: Path, paleta_nome: str = "") -> dict:
     from playwright.sync_api import sync_playwright
 
@@ -97,7 +114,7 @@ def gerar(pasta_projeto: Path, paleta_nome: str = "") -> dict:
     pasta = pasta_projeto / "funil"
     funil = ler_funil(pasta)
     projecao = projetar(funil)
-    nome = paleta_nome or _paleta_config(pasta_projeto) or PALETA_PADRAO
+    nome = paleta_nome or _paleta_config(pasta_projeto) or _paleta_oferta(pasta_projeto) or PALETA_PADRAO
     documento = html_mapa(funil, projecao, nome)
     html_arq, png_arq = pasta / "mapa.html", pasta / "mapa.png"
     tmp_html, tmp_png = pasta / ".mapa.html", pasta / ".mapa.png"

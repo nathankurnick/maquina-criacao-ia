@@ -45,6 +45,9 @@ def conversao(v, etapa: str) -> float:
         numero = float(v)
     else:
         raise ValueError("conversão inválida")
+    if numero == 1 and not (isinstance(v, str) and v.strip().endswith("%")) and (
+            isinstance(v, int) or (isinstance(v, str) and v.strip().replace(",", ".") == "1")):
+        raise ValueError('conversão "1" é ambígua: escreva 0.01 (1%) ou 1.0 (100%) — ou use "1%" ou "100%"')
     if numero > 1 or (isinstance(v, str) and v.strip().endswith("%")):
         numero /= 100
     if not math.isfinite(numero) or not 0 <= numero <= 1:
