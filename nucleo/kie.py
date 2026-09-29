@@ -16,6 +16,10 @@ class KieErro(MaquinaErro):
     pass
 
 
+class KieErroPermanente(KieErro):
+    """Repetir não adianta (chave/pedido inválido, tarefa falhou)."""
+
+
 def _requisitar(url: str, chave: str, dados: "dict | None" = None) -> dict:
     headers = {"Authorization": f"Bearer {chave}"}
     corpo = None
@@ -29,9 +33,11 @@ def _requisitar(url: str, chave: str, dados: "dict | None" = None) -> dict:
             return json.loads(r.read())
     except urllib.error.HTTPError as e:
         if e.code in (401, 403):
-            raise KieErro("A KIE recusou a chave. Confira em https://kie.ai/api-key e rode: maquina chaves") from e
+            raise KieErroPermanente("A KIE recusou a chave. Confira em https://kie.ai/api-key e rode: maquina chaves") from e
         if e.code == 429:
             raise KieErro("A KIE recebeu muitas requisições. Espere um minuto e tente de novo.") from e
+        if e.code in (400, 404, 422):
+            raise KieErroPermanente(f"A KIE recusou o pedido (erro {e.code}). Confira os dados e tente de novo.") from e
         raise KieErro(f"A KIE respondeu com erro {e.code}. Tente de novo em alguns minutos.") from e
     except (OSError, http.client.HTTPException) as e:  # URLError e TimeoutError são OSError
         raise KieErro("Não consegui falar com a KIE. Confira sua internet e tente de novo.") from e
@@ -41,7 +47,7 @@ def _requisitar(url: str, chave: str, dados: "dict | None" = None) -> dict:
 
 def _checar(d: dict) -> dict:
     if d.get("code") != 200:
-        raise KieErro(f"A KIE recusou o pedido: {d.get('msg') or d}. Confira a chave e os créditos.")
+        raise KieErroPermanente(f"A KIE recusou o pedido: {d.get('msg') or d}. Confira a chave e os créditos.")
     return d
 
 
@@ -51,7 +57,7 @@ INESPERADA = "A KIE devolveu uma resposta inesperada. Tente de novo em alguns mi
 def creditos(chave: str) -> float:
     try:
         return float(_checar(_requisitar(f"{BASE}/chat/credit", chave)).get("data") or 0)
-    except (KeyError, TypeError, ValueError) as e:
+    except (KeyError, TypeError, ValueError, AttributeError) as e:
         raise KieErro(INESPERADA) from e
 
 
@@ -60,10 +66,10 @@ def validar(chave: str) -> str:
 
 
 def criar_tarefa(chave: str, modelo: str, entrada: dict) -> str:
-    d = _checar(_requisitar(f"{BASE}/jobs/createTask", chave, {"model": modelo, "input": entrada}))
     try:
+        d = _checar(_requisitar(f"{BASE}/jobs/createTask", chave, {"model": modelo, "input": entrada}))
         return d["data"]["taskId"]
-    except (KeyError, TypeError) as e:
+    except (KeyError, TypeError, AttributeError) as e:
         raise KieErro(INESPERADA) from e
 
 
@@ -79,11 +85,11 @@ def aguardar(chave: str, task_id: str, intervalo: float = 15, limite: float = 18
             if estado == "success":
                 return json.loads(d["resultJson"])
             if estado == "fail":
-                raise KieErro(f"A KIE não conseguiu gerar: {d.get('failMsg') or 'motivo não informado'}")
+                raise KieErroPermanente(f"A KIE não conseguiu gerar: {d.get('failMsg') or 'motivo não informado'}")
             falhas = 0
+        except KieErroPermanente:
+            raise
         except KieErro as e:
-            if "não conseguiu gerar" in str(e) or "recusou" in str(e):
-                raise
             falhas += 1
             if falhas > 3:
                 raise KieErro(f"Perdi a conexão com a KIE ({e}). Sua tarefa continua lá: "
@@ -101,5 +107,5 @@ def baixar(url: str, destino: Path) -> Path:
         with urllib.request.urlopen(req, timeout=120) as r:
             destino.write_bytes(r.read())
     except (OSError, http.client.HTTPException) as e:  # inclui HTTPError, URLError, timeout, disco
-        raise KieErro("A imagem foi gerada, mas não consegui baixar. Tente de novo.") from e
+        raise KieErro("O arquivo foi gerado, mas não consegui baixar. Tente de novo.") from e
     return destino

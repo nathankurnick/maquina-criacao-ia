@@ -169,3 +169,76 @@ def test_task_id_e_codificado_na_url(monkeypatch):
     monkeypatch.setattr(kie, "_requisitar", falso)
     kie.aguardar("k", "a&b=c", intervalo=0, dormir=lambda s: None)
     assert vistas[0].endswith("taskId=a%26b%3Dc")
+
+
+@pytest.mark.parametrize("codigo", [400, 401, 403, 404, 422])
+def test_http_permanente_levanta_kie_erro_permanente(monkeypatch, codigo):
+    def falha(req, timeout):
+        raise _erro_http(codigo)
+    monkeypatch.setattr(kie.urllib.request, "urlopen", falha)
+    with pytest.raises(kie.KieErroPermanente):
+        kie.creditos("k")
+
+
+@pytest.mark.parametrize("codigo", [429, 500, 503])
+def test_http_transitorio_nao_e_permanente(monkeypatch, codigo):
+    def falha(req, timeout):
+        raise _erro_http(codigo)
+    monkeypatch.setattr(kie.urllib.request, "urlopen", falha)
+    with pytest.raises(kie.KieErro) as e:
+        kie.creditos("k")
+    assert not isinstance(e.value, kie.KieErroPermanente)
+
+
+def test_code_diferente_de_200_e_permanente(monkeypatch):
+    monkeypatch.setattr(kie, "_requisitar", lambda url, chave, dados=None: {"code": 402, "msg": "sem crédito"})
+    with pytest.raises(kie.KieErroPermanente):
+        kie.creditos("k")
+
+
+def test_aguardar_nao_retenta_erro_permanente(monkeypatch):
+    chamadas = []
+
+    def falso(url, chave, dados=None):
+        chamadas.append(1)
+        raise kie.KieErroPermanente("nunca vai dar")
+    monkeypatch.setattr(kie, "_requisitar", falso)
+    with pytest.raises(kie.KieErroPermanente):
+        kie.aguardar("k", "t", intervalo=0, dormir=lambda s: None)
+    assert len(chamadas) == 1
+
+
+def test_aguardar_state_fail_e_permanente(monkeypatch):
+    monkeypatch.setattr(kie, "_requisitar", lambda url, chave, dados=None:
+                        {"code": 200, "data": {"state": "fail", "failMsg": "x"}})
+    with pytest.raises(kie.KieErroPermanente):
+        kie.aguardar("k", "t", intervalo=0, dormir=lambda s: None)
+
+
+def test_aguardar_retenta_erro_transitorio_com_palavra_recusou(monkeypatch):
+    seq = iter([kie.KieErro("a rede recusou a conexão"),
+                {"code": 200, "data": {"state": "success", "resultJson": "{}"}}])
+
+    def falso(url, chave, dados=None):
+        r = next(seq)
+        if isinstance(r, Exception):
+            raise r
+        return r
+    monkeypatch.setattr(kie, "_requisitar", falso)
+    assert kie.aguardar("k", "t", intervalo=0, dormir=lambda s: None) == {}
+
+
+def test_json_que_nao_e_objeto_vira_erro(monkeypatch):
+    monkeypatch.setattr(kie, "_requisitar", lambda url, chave, dados=None: [1])
+    with pytest.raises(kie.KieErro, match="inesperada"):
+        kie.creditos("k")
+    with pytest.raises(kie.KieErro, match="inesperada"):
+        kie.criar_tarefa("k", "m", {})
+
+
+def test_baixar_fala_arquivo(monkeypatch, tmp_path):
+    def falha(req, timeout):
+        raise urllib.error.URLError("x")
+    monkeypatch.setattr(kie.urllib.request, "urlopen", falha)
+    with pytest.raises(kie.KieErro, match="O arquivo foi gerado"):
+        kie.baixar("http://x/i.png", tmp_path / "i.png")
