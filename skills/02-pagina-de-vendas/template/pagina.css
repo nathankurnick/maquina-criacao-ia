@@ -88,11 +88,13 @@ a.cta:focus-visible,summary:focus-visible{outline:3px solid var(--pg-destaque);o
   .grade-2{grid-template-columns:repeat(2,minmax(0,1fr))}
   .carrossel img{width:288px}
 }
-@media (min-width:1024px){
-  .grade-3l{grid-template-columns:repeat(3,minmax(0,1fr))}
-}
 @media (min-width:900px){
-  .hero-grade{grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);grid-template-areas:"texto mockup" "cta mockup";text-align:left;column-gap:48px}
+  .hero-grade{grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);grid-template-rows:auto auto;align-content:center;row-gap:0;grid-template-areas:"texto mockup" "cta mockup";text-align:left;column-gap:48px}
   .hero-grade .logo{margin-left:0}
   .hero-mockup{max-width:520px}
+  .hero-texto{align-self:end}
+  .hero-cta{align-self:start;margin-top:32px}
+}
+@media (min-width:1024px){
+  .grade-3l{grid-template-columns:repeat(3,minmax(0,1fr))}
 }

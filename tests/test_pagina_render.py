@@ -409,3 +409,64 @@ def test_aviso_quando_carrossel_mudou_depois_dos_mockups(tmp_path):
     (pag / "imagens" / "carrossel" / "01-a.png").write_bytes(b"\x89PNG\r\n\x1a\n")
     _, avisos = pr.montar_site(p)
     assert any("pagina_mockups.py" in a for a in avisos)
+
+
+def test_depoimento_com_lazy_e_tamanho():
+    c = _conteudo(depoimentos={"titulo": "D"})
+    h = _html(conteudo=c, imagens=_imgs(depoimentos=["img/depoimento-01.jpg"],
+                                        tamanhos={"img/depoimento-01.jpg": (300, 600)}))
+    assert 'alt="Depoimento de aluno 1" width="300" height="600" loading="lazy"' in h
+
+
+def test_dimensoes_jpeg_e_webp(tmp_path):
+    import struct
+    jpg = tmp_path / "a.jpg"
+    app0 = b"\xff\xe0" + struct.pack(">H", 4) + b"\x00\x00"
+    sof = b"\xff\xc0" + struct.pack(">HBHHB", 11, 8, 50, 70, 3) + b"\x00" * 6
+    jpg.write_bytes(b"\xff\xd8" + app0 + sof)
+    assert pr._dimensoes(jpg) == (70, 50)
+    x = tmp_path / "x.webp"
+    x.write_bytes(b"RIFF" + b"\x00" * 4 + b"WEBPVP8X" + b"\x0a\x00\x00\x00" + b"\x00" * 4
+                  + (99).to_bytes(3, "little") + (49).to_bytes(3, "little"))
+    assert pr._dimensoes(x) == (100, 50)
+    ll = tmp_path / "l.webp"
+    v = (79) | (39 << 14)
+    ll.write_bytes(b"RIFF" + b"\x00" * 4 + b"WEBPVP8L" + b"\x05\x00\x00\x00" + b"\x2f" + v.to_bytes(4, "little") + b"\x00" * 8)
+    assert pr._dimensoes(ll) == (80, 40)
+    lossy = tmp_path / "y.webp"
+    lossy.write_bytes(b"RIFF" + b"\x00" * 4 + b"WEBPVP8 " + b"\x0a\x00\x00\x00" + b"\x00" * 3
+                      + b"\x9d\x01\x2a" + struct.pack("<HH", 64, 32))
+    assert pr._dimensoes(lossy) == (64, 32)
+    lixo = tmp_path / "z.jpg"
+    lixo.write_bytes(b"\xff\xd8\x00")
+    assert pr._dimensoes(lixo) is None
+
+
+def test_sem_aviso_quando_mockups_sao_mais_novos(tmp_path):
+    import os
+    import time
+    p = tmp_path / "proj"
+    pag = p / "pagina"
+    (pag / "imagens" / "carrossel").mkdir(parents=True)
+    (pag / "imagens" / "mockups").mkdir()
+    (pag / "conteudo.json").write_text(json.dumps({"hero": {"headline": "H"}}), encoding="utf-8")
+    raw = pag / "imagens" / "carrossel" / "01-a.png"
+    raw.write_bytes(b"\x89PNG\r\n\x1a\n")
+    os.utime(raw, (time.time() - 100, time.time() - 100))
+    (pag / "imagens" / "mockups" / "pagina-01.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+    _, avisos = pr.montar_site(p)
+    assert not any("pagina_mockups.py" in a for a in avisos)
+
+
+def test_nao_copia_mockups_de_secao_inativa(tmp_path):
+    p = tmp_path / "proj"
+    pag = p / "pagina"
+    (pag / "imagens" / "mockups").mkdir(parents=True)
+    (pag / "conteudo.json").write_text(json.dumps({
+        "hero": {"headline": "H"}, "bonus": {"ativo": False, "itens": [{"titulo": "A"}]},
+        "carrossel": {"ativo": False}}), encoding="utf-8")
+    for n in ("bonus-1.png", "pagina-01.png"):
+        (pag / "imagens" / "mockups" / n).write_bytes(b"\x89PNG\r\n\x1a\n")
+    index, _ = pr.montar_site(p)
+    assert not (index.parent / "img" / "mockup-bonus-1.png").exists()
+    assert not (index.parent / "img" / "carrossel-01.png").exists()

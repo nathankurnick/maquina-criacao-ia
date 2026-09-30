@@ -79,15 +79,50 @@ def _cabeca(b: dict) -> str:
     return s
 
 
-def _dimensoes_png(arq: Path) -> "tuple[int, int] | None":
+def _dimensoes(arq: Path) -> "tuple[int, int] | None":
+    """Largura e altura de PNG, JPEG ou WebP lendo só o cabeçalho; None se algo fugir do esperado."""
     try:
         with open(arq, "rb") as f:
-            cab = f.read(24)
-    except OSError:
+            cab = f.read(32)
+            if cab.startswith(b"\x89PNG\r\n\x1a\n") and len(cab) >= 24:
+                return struct.unpack(">II", cab[16:24])
+            if cab[:2] == b"\xff\xd8":
+                f.seek(2)
+                while True:
+                    m = f.read(2)
+                    if len(m) < 2 or m[0] != 0xFF:
+                        return None
+                    if m[1] == 0xFF:
+                        f.seek(-1, 1)
+                        continue
+                    if m[1] in (0xD8, 0x01) or 0xD0 <= m[1] <= 0xD7:
+                        continue
+                    tam = f.read(2)
+                    if len(tam) < 2:
+                        return None
+                    n = struct.unpack(">H", tam)[0]
+                    if m[1] in (0xC0, 0xC1, 0xC2):
+                        d = f.read(5)
+                        if len(d) < 5:
+                            return None
+                        h, w = struct.unpack(">HH", d[1:5])
+                        return (w, h) if w and h else None
+                    f.seek(n - 2, 1)
+            if cab[:4] == b"RIFF" and cab[8:12] == b"WEBP" and len(cab) >= 30:
+                tipo = cab[12:16]
+                if tipo == b"VP8X":
+                    return (int.from_bytes(cab[24:27], "little") + 1, int.from_bytes(cab[27:30], "little") + 1)
+                if tipo == b"VP8L" and cab[20] == 0x2F:
+                    v = int.from_bytes(cab[21:25], "little")
+                    return ((v & 0x3FFF) + 1, ((v >> 14) & 0x3FFF) + 1)
+                if tipo == b"VP8 " and cab[23:26] == b"\x9d\x01\x2a":
+                    return (struct.unpack("<H", cab[26:28])[0] & 0x3FFF, struct.unpack("<H", cab[28:30])[0] & 0x3FFF)
+    except (OSError, struct.error, ValueError):
         return None
-    if not cab.startswith(b"\x89PNG\r\n\x1a\n") or len(cab) < 24:
-        return None
-    return struct.unpack(">II", cab[16:24])
+    return None
+
+
+_dimensoes_png = _dimensoes
 
 
 def _tam(src: str, tamanhos: dict) -> str:
@@ -100,7 +135,7 @@ def _hero(b, logo, href, nome="", mockup="", tamanhos=None):
         return ""
     partes = []
     if logo:
-        partes.append(f'<img class="logo" src="{e(logo)}" alt="{e(nome)}">')
+        partes.append(f'<img class="logo" src="{e(logo)}" alt="{e(nome)}"{_tam(logo, tamanhos or {})}>')
     if b["badge"]:
         partes.append(f'<p class="badge">{e(b["badge"])}</p>')
     partes.append(f"<h1>{com_destaque(b['headline'])}</h1>")
@@ -175,10 +210,10 @@ def _bonus(b, mockups=None, tamanhos=None):
     return _secao("escura", f'<div class="caixa">{_cabeca(b)}<div class="grade grade-2 grade-3l">{"".join(cartoes)}</div></div>')
 
 
-def _depoimentos(b, imagens):
+def _depoimentos(b, imagens, tamanhos=None):
     if not b["ativo"] or not imagens:
         return ""
-    fotos = "".join(f'<img src="{e(src)}" alt="Depoimento de aluno {i}">' for i, src in enumerate(imagens, 1))
+    fotos = "".join(f'<img src="{e(src)}" alt="Depoimento de aluno {i}"{_tam(src, tamanhos or {})} loading="lazy">' for i, src in enumerate(imagens, 1))
     return _secao("clara", f'<div class="caixa">{_cabeca(b)}<div class="grade grade-2 grade-3l depoimentos">{fotos}</div></div>')
 
 
@@ -267,7 +302,7 @@ def render_html(conteudo: dict, config: dict, imagens: dict, ano: int) -> str:
         _incluso(conteudo["incluso"]),
         _entrega(conteudo["entrega"]),
         _bonus(conteudo["bonus"], imagens.get("bonus", {}), tamanhos),
-        _depoimentos(conteudo["depoimentos"], imagens.get("depoimentos", [])),
+        _depoimentos(conteudo["depoimentos"], imagens.get("depoimentos", []), tamanhos),
         _planos(planos),
         _garantia(conteudo["garantia"], href),
         _faq(conteudo["faq"]),
@@ -336,13 +371,16 @@ def _montar(pagina, conteudo, config, avisos, site, novo, rel="pagina"):
         destino = novo / "img" / f"logo{logos[0].suffix.lower()}"
         shutil.copyfile(logos[0], destino)
         imagens["logo"] = f"img/{destino.name}"
+        wh = _dimensoes(logos[0])
+        if wh:
+            imagens["tamanhos"][imagens["logo"]] = wh
     mockups = pagina / "imagens" / "mockups"
 
     def copiar(origem: Path, nome: str) -> str:
         destino = novo / "img" / nome
         shutil.copyfile(origem, destino)
         src = f"img/{nome}"
-        wh = _dimensoes_png(origem)
+        wh = _dimensoes(origem)
         if wh:
             imagens["tamanhos"][src] = wh
         return src
@@ -350,10 +388,12 @@ def _montar(pagina, conteudo, config, avisos, site, novo, rel="pagina"):
     if conteudo["hero"]["ativo"] and (mockups / "topo.png").is_file():
         imagens["topo"] = copiar(mockups / "topo.png", "mockup-topo.png")
     for n in range(1, len(conteudo["bonus"]["itens"]) + 1):
+        if not conteudo["bonus"]["ativo"]:
+            break
         if (mockups / f"bonus-{n}.png").is_file():
             imagens["bonus"][n] = copiar(mockups / f"bonus-{n}.png", f"mockup-bonus-{n}.png")
     brutas = fotos_da_pasta(pagina / "imagens" / "carrossel")
-    paginas = sorted(mockups.glob("pagina-[0-9][0-9].png")) if mockups.is_dir() else []
+    paginas = sorted(mockups.glob("pagina-[0-9][0-9].png")) if mockups.is_dir() and conteudo["carrossel"]["ativo"] else []
     if paginas:
         imagens["carrossel_mockup"] = True
         for n, foto in enumerate(paginas, 1):
