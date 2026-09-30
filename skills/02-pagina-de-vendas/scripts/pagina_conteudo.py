@@ -79,6 +79,14 @@ def _texto(v, padrao: str = "") -> str:
     return padrao
 
 
+_SLUG = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
+
+
+def _slug(v) -> str:
+    t = _texto(v)
+    return t if _SLUG.fullmatch(t) else ""
+
+
 def _preco(v) -> str:
     if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v):
         return str(int(v)) if float(v).is_integer() else str(v)
@@ -138,7 +146,8 @@ def normalizar(bruto: object) -> "tuple[dict, list[str]]":
     h = bloco("hero")
     hero = {"ativo": _bool(h.get("ativo"), True), "badge": _texto(h.get("badge")),
             "headline": _texto(h.get("headline")), "subheadline": _texto(h.get("subheadline")),
-            "cta": _texto(h.get("cta"), "QUERO ACESSAR AGORA")}
+            "cta": _texto(h.get("cta"), "QUERO ACESSAR AGORA"),
+            "entregavel": _slug(h.get("entregavel"))}
     if hero["ativo"] and not hero["headline"]:
         hero["ativo"] = False
         avisos.append("hero: sem headline — o topo da página não aparece.")
@@ -164,7 +173,8 @@ def normalizar(bruto: object) -> "tuple[dict, list[str]]":
     incluso = com_itens("incluso", ("titulo", "nota"), _titulo_descricao)
     entrega = com_itens("entrega", ("titulo", "subtitulo"), _titulo_descricao)
     bonus = com_itens("bonus", ("titulo", "subtitulo"), lambda x: {
-        **_titulo_descricao(x), "valor": _preco(_objeto(x).get("valor"))})
+        **_titulo_descricao(x), "valor": _preco(_objeto(x).get("valor")),
+        "entregavel": _slug(_objeto(x).get("entregavel"))})
 
     d = bloco("depoimentos")
     depoimentos = {"ativo": _bool(d.get("ativo"), True),

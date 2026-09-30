@@ -200,3 +200,12 @@ def test_url_editavel_no_config_so_https():
             pc.validar_valor("url", ruim)
     with pytest.raises(ValueError):
         pc.validar_valor("site_id", "abc")
+
+
+def test_entregavel_no_hero_e_nos_bonus():
+    bruto = {"hero": {"headline": "H", "entregavel": "pack-casas"},
+             "bonus": {"itens": [{"titulo": "A", "entregavel": "guia-terreno"}, {"titulo": "B"},
+                                 {"titulo": "C", "entregavel": "../fora"}]}}
+    c, _ = pc.normalizar(bruto)
+    assert c["hero"]["entregavel"] == "pack-casas"
+    assert [i["entregavel"] for i in c["bonus"]["itens"]] == ["guia-terreno", "", ""]

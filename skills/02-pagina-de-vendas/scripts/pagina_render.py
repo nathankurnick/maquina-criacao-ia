@@ -255,7 +255,7 @@ def render_html(conteudo: dict, config: dict, imagens: dict, ano: int) -> str:
     )
 
 
-def _fotos(pasta: Path) -> list[Path]:
+def fotos_da_pasta(pasta: Path) -> list[Path]:
     if not pasta.is_dir():
         return []
     return sorted(p for p in pasta.iterdir() if p.is_file() and p.suffix.lower() in EXT_FOTO
@@ -304,7 +304,7 @@ def _montar(pagina, conteudo, config, avisos, site, novo, rel="pagina"):
         shutil.copyfile(logos[0], destino)
         imagens["logo"] = f"img/{destino.name}"
     for tipo, prefixo in (("carrossel", "carrossel"), ("depoimentos", "depoimento")):
-        for n, foto in enumerate(_fotos(pagina / "imagens" / tipo), 1):
+        for n, foto in enumerate(fotos_da_pasta(pagina / "imagens" / tipo), 1):
             destino = novo / "img" / f"{prefixo}-{n:02d}{foto.suffix.lower()}"
             shutil.copyfile(foto, destino)
             imagens[tipo].append(f"img/{destino.name}")
