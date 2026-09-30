@@ -24,7 +24,7 @@ def test_referencias_existem():
     t = _texto()
     for rel in re.findall(r"`((?:scripts|referencias|template)/[\w.-]+)`", t):
         assert (SKILL / rel).exists(), rel
-    for s in ("pagina_render.py", "pagina_config.py", "pagina_publicar.py"):
+    for s in ("pagina_render.py", "pagina_config.py", "pagina_publicar.py", "pagina_mockups.py"):
         assert f"scripts/{s}" in t
 
 
@@ -68,3 +68,10 @@ def test_skill_cobre_endereco_paleta_e_head():
     assert "oferta definir <slug> paleta='<escolhida>'" in t
     assert "<P>/pagina/head.html" in t and 'open "<P>/pagina"' in t
     assert "remonta a página antes" in t and "link_checkout" in t and "planos.basico.checkoutUrl" in t
+
+
+def test_passo_de_mockups():
+    t = _texto()
+    assert "scripts/pagina_mockups.py" in t and "--estimar" in t and "--sem-kie" in t
+    assert t.index('pagina_mockups.py" --projeto') < t.index('pagina_render.py" --projeto')
+    assert "hero.entregavel" in t or '"entregavel"' in t

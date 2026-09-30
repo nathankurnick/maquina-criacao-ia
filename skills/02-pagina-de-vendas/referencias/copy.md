@@ -123,6 +123,8 @@ O `checkoutUrl` do exemplo está vazio de propósito: use o `link_checkout` real
   inválido desliga o plano e o render avisa.
   Premium só se o aluno tiver um segundo link de checkout, diferente do básico.
 - `garantia.dias`: o número de dias da garantia do oferta.md.
+- `hero.entregavel` e `bonus.itens[].entregavel` (opcionais): nome da pasta do entregável em
+  `<P>/entregaveis/` (só minúsculas, números e hífen). A capa dessa pasta vira o mockup da página.
 - `rodape.disclaimer`: o aviso legal é padrão (deixe vazio e entra o texto padrão); se o aluno
   quiser tirar, use `"-"` (o rodapé fica só com a linha de direitos reservados).
 

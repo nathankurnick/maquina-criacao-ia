@@ -138,6 +138,17 @@ Página do upsell — escreva `<P>/funil/upsell/oto.json`:
 - `pre_headline`, `headline`, `copy_abaixo`, `botao_texto`, `recusar_texto` já vêm com o texto
   do método; só inclua se quiser mudar.
 - `formato: "texto"` + campo `texto` (parágrafos separados por linha em branco) pra upsell em texto.
+- `"entregavel"` (opcional): pasta em `<P>/funil/upsell/entregaveis/` com `capa.png`; `"nome_produto"`
+  (opcional): nome do produto, usado quando não há pasta de entregável.
+
+Mockup do produto (opcional, recomendado): com o `entregavel` (ou o `nome_produto`) no `oto.json`,
+gere o mockup. Com a chave da KIE custa 1 geração + 1 remoção de fundo; avise o aluno antes.
+
+```bash
+PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/05-funil/scripts"; "$PY" "$S/funil_oto.py" --pasta "<P>/funil/upsell" --mockup
+```
+
+No formato vídeo o mockup aparece pequeno acima do botão; no formato texto, no lugar do vídeo.
 - `botao_no_player: true`: para players (VTurb) cujo botão aparece DENTRO do vídeo; a página não
   desenha botão próprio (só o "não, obrigado") e `checkout_url` deixa de ser obrigatório.
 - `botao_html`: se a plataforma der um botão de compra em 1 clique, cole o código aqui (aí o
@@ -190,7 +201,9 @@ PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/05-funil/scripts"; 
 Downsell (construído ANTES do upsell): repita em `<P>/funil/downsell/` (`oto.json` com `recusar_url` = obrigado/área de membros). Ele reaproveita a estrutura
 do roteiro do upsell num texto de página mais curto (formato `texto`), com a justificativa da queda
 de preço; não faça nova rodada de 12–17 nomes, a menos que o aluno queira. Conteúdo em
-`<P>/funil/downsell/entregaveis/<item>/`, como produto separado (mesmas regras). Monte e, depois de publicar na mão, guarde o link:
+`<P>/funil/downsell/entregaveis/<item>/`, como produto separado (mesmas regras). Se o `oto.json` do downsell tiver `"entregavel"` ou `"nome_produto"`, gere o mockup antes
+de montar (mesmo comando do upsell, com `--pasta "<P>/funil/downsell" --mockup`; `--mockup` não vai junto
+com `--publicar` nem `--definir-url`). Monte e, depois de publicar na mão, guarde o link:
 
 ```bash
 PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/05-funil/scripts"; "$PY" "$S/funil_oto.py" --pasta "<P>/funil/downsell" --paleta '<paleta>' --publicar

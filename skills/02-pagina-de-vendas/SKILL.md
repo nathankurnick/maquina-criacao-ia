@@ -13,7 +13,8 @@ definições no começo de cada comando, exatamente como nos exemplos, e escreva
 sempre em aspas simples (apóstrofo dentro do valor vira `'\''`).
 
 Scripts desta skill: `scripts/pagina_render.py` (monta o site), `scripts/pagina_config.py`
-(paleta, pixels, SEO), `scripts/pagina_publicar.py` (Netlify). Referência de copy:
+(paleta, pixels, SEO), `scripts/pagina_mockups.py` (gera os mockups),
+`scripts/pagina_publicar.py` (Netlify). Referência de copy:
 `referencias/copy.md`. Visual: `template/pagina.css`.
 
 ## Passo 1 — Projeto e oferta
@@ -53,14 +54,39 @@ bloco (edite só aquele bloco no JSON).
 A IA não inventa prova (depoimento, nome de cliente, nota, número de alunos). Depoimento só
 entra como print real do aluno (Passo 3).
 
-## Passo 3 — Imagens (opcional)
+## Passo 3 — Imagens e mockups
 
-Explique as pastas e deixe o aluno colocar os arquivos:
+Pastas que o aluno pode preencher:
 
 - `<P>/pagina/imagens/logo.png` — logo (png, jpg, webp ou svg).
-- `<P>/pagina/imagens/carrossel/` — prints do material por dentro (páginas do ebook, telas).
+- `<P>/pagina/imagens/carrossel/` — páginas do material por dentro. O Sistema 03 já coloca aqui as
+  2 páginas mais visuais de cada entregável; o aluno pode trocar ou acrescentar (máx. 6 aparecem).
 - `<P>/pagina/imagens/depoimentos/` — **só prints de depoimentos reais**. Sem imagens, a seção
   fica escondida.
+
+Ligue a copy aos entregáveis do Sistema 03 (pastas em `<P>/entregaveis/`): no `conteudo.json`, ponha
+`"entregavel": "<pasta do produto principal>"` em `hero` e `"entregavel": "<pasta do bônus>"` em cada
+item de `bonus.itens` que tiver pasta. Bônus sem pasta ganha uma capa simples com o título.
+
+Veja o que vai ser gerado e quanto custa:
+
+```bash
+PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/02-pagina-de-vendas/scripts"; "$PY" "$S/pagina_mockups.py" --projeto "<P>" --estimar
+```
+
+Mostre a estimativa ao aluno e peça o ok antes de gastar crédito da KIE. Com o ok:
+
+```bash
+PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/02-pagina-de-vendas/scripts"; "$PY" "$S/pagina_mockups.py" --projeto "<P>"
+```
+
+Se ele não quiser gastar crédito, use `--sem-kie` (tudo montado por código, grátis). Pra gerar de novo
+algo que já saiu (ex.: não gostou do mockup da KIE), use `--refazer`. O que não mudou não é cobrado de
+novo. Saída 0 mesmo quando a KIE falha: os avisos dizem quais saíram no modo código e por quê.
+Saída 1 = `conteudo.json` ausente/quebrado ou falha ao montar (a mensagem diz).
+
+Sempre que o aluno trocar imagens do carrossel, capas do 03 ou bônus, rode o `pagina_mockups.py`
+de novo antes de montar a página.
 
 ## Passo 4 — Paleta e pixels
 

@@ -84,3 +84,8 @@ def test_exemplo_do_oto_json_e_valido(tmp_path):
         .replace("<link do downsell (publicado antes) ou da página de obrigado / área de membros>", "https://x.com/ok")
     (tmp_path / "oto.json").write_text(exemplo, encoding="utf-8")
     assert funil_oto.ler_oto(tmp_path)["atraso_segundos"] > 0
+
+
+def test_mockup_do_oto_documentado():
+    t = _texto()
+    assert "--mockup" in t and '"entregavel"' in t

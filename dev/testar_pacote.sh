@@ -270,13 +270,20 @@ cat > "$E2/planilha.json" <<'JSON'
 JSON
 espera_saida 0 "$PY" "$S3/entregavel_planilha.py" --pasta "$E2"
 passo "03: remontar a página pro carrossel aparecer"
+espera_saida 0 "$PY" "$S2/pagina_mockups.py" --projeto "$P" --estimar
+espera_saida 0 "$PY" "$S2/pagina_mockups.py" --projeto "$P" --sem-kie
+"$PY" - "$P/pagina/imagens/mockups/topo.png" <<'PY' && ok "mockup do topo com fundo transparente" || falha "mockup do topo sem transparência"
+import sys
+d = open(sys.argv[1], "rb").read()
+sys.exit(0 if d.startswith(b"\x89PNG") and d[25] in (4, 6) else 1)
+PY
 espera_saida 0 "$PY" "$S2/pagina_render.py" --projeto "$P"
-# o render renomeia as fotos do carrossel pra img/carrossel-NN (na ordem dos nomes: 01-guia… primeiro)
-if grep -q 'img/carrossel-01.jpg' "$P/pagina/site/index.html" 2>/dev/null \
-   && cmp -s "$P/pagina/imagens/carrossel/01-guia-marmitas-01.jpg" "$P/pagina/site/img/carrossel-01.jpg"; then
-  ok "carrossel com a capa do guia na página"
+if grep -q 'img/mockup-topo.png' "$P/pagina/site/index.html" 2>/dev/null \
+   && grep -q 'carrossel-mockup' "$P/pagina/site/index.html" 2>/dev/null \
+   && [ -f "$P/pagina/site/img/carrossel-01.png" ]; then
+  ok "página com mockup no topo e carrossel de mockups"
 else
-  falha "carrossel do guia não apareceu na página remontada"
+  falha "mockups não apareceram na página remontada"
 fi
 
 # ─────────────────────────────── 04 Anúncios ───────────────────────────────
@@ -337,7 +344,7 @@ ESPERADOS=(
   "$B/ofertas.json" "$B/ofertas.md" "$P/pesquisa/escolhida.json"
   "$P/pagina/config.json" "$P/pagina/site/index.html"
   "$E/capa.png" "$E/mockup.png" "$E/guia-marmitas.pdf" "$E/previa/amostra-1.png" "$E/previa/amostra-2.png"
-  "$P/pagina/imagens/carrossel/01-guia-marmitas-01.jpg"
+  "$P/pagina/imagens/carrossel/01-guia-marmitas-01.png"
   "$E2/planilha-custos.xlsx"
   "$P/anuncios/criativos/dor-cozinha-1x1.jpg" "$P/anuncios/criativos/dor-cozinha-9x16.jpg"
   "$P/anuncios/textos.md" "$P/anuncios/roteiros.md" "$P/anuncios/plano-de-teste.xlsx"
