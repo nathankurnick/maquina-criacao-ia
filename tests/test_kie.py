@@ -299,3 +299,82 @@ def test_gerar_imagem_recusa_arquivo_que_nao_e_imagem(tmp_path, monkeypatch):
     with pytest.raises(kie.KieErro, match="não é imagem"):
         kie.gerar_imagem("k", "cena", "9:16", tmp_path / "arte.png")
     assert list(tmp_path.iterdir()) == []
+
+
+import struct as _struct
+import zlib as _zlib
+
+
+def _png_rgba(alfa):
+    def chunk(t, d):
+        return _struct.pack(">I", len(d)) + t + d + _struct.pack(">I", _zlib.crc32(t + d))
+    linha = b"\x00" + bytes([9, 9, 9, alfa]) * 4
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", _struct.pack(">IIBBBBB", 4, 4, 8, 6, 0, 0, 0))
+            + chunk(b"IDAT", _zlib.compress(linha * 4)) + chunk(b"IEND", b""))
+
+
+def test_enviar_arquivo_manda_base64_e_devolve_url(tmp_path, monkeypatch):
+    arq = tmp_path / "capa.jpg"
+    arq.write_bytes(b"\xff\xd8\xff" + b"x" * 10)
+    visto = {}
+
+    def falso(url, chave, dados=None):
+        visto.update(url=url, dados=dados)
+        return {"code": 200, "data": {"fileUrl": "https://kieai.redpandaai.co/files/maquina/a.jpg"}}
+
+    monkeypatch.setattr(kie, "_requisitar", falso)
+    assert kie.enviar_arquivo("k", arq) == "https://kieai.redpandaai.co/files/maquina/a.jpg"
+    assert visto["url"] == kie.UPLOAD
+    assert visto["dados"]["base64Data"].startswith("data:image/jpeg;base64,")
+    assert visto["dados"]["uploadPath"] == "maquina" and visto["dados"]["fileName"].endswith(".jpg")
+
+
+def test_enviar_arquivo_grande_demais(tmp_path):
+    arq = tmp_path / "g.png"
+    arq.write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * (kie.LIMITE_UPLOAD + 1))
+    with pytest.raises(kie.KieErroPermanente, match="grande"):
+        kie.enviar_arquivo("k", arq)
+
+
+def test_enviar_arquivo_resposta_sem_url(tmp_path, monkeypatch):
+    arq = tmp_path / "c.png"
+    arq.write_bytes(b"\x89PNG\r\n\x1a\nx")
+    monkeypatch.setattr(kie, "_requisitar", lambda url, chave, dados=None: {"code": 200, "data": {}})
+    with pytest.raises(kie.KieErro):
+        kie.enviar_arquivo("k", arq)
+
+
+def test_gerar_imagem_url_com_referencias(monkeypatch):
+    visto = {}
+    monkeypatch.setattr(kie, "criar_tarefa", lambda chave, modelo, entrada: visto.update(e=entrada) or "t")
+    monkeypatch.setattr(kie, "aguardar", lambda chave, tid, intervalo=5, limite=150: {"resultUrls": ["https://r/1.png"]})
+    refs = [f"https://f/{i}" for i in range(12)]
+    assert kie.gerar_imagem_url("k", "p", "1:1", referencias=refs) == "https://r/1.png"
+    assert visto["e"]["image_input"] == refs[:10] and visto["e"]["aspect_ratio"] == "1:1"
+
+
+def test_gerar_imagem_sem_referencias_mantem_entrada_antiga(tmp_path, monkeypatch):
+    visto = {}
+    monkeypatch.setattr(kie, "criar_tarefa", lambda chave, modelo, entrada: visto.update(e=entrada) or "t")
+    monkeypatch.setattr(kie, "aguardar", lambda chave, tid, intervalo=5, limite=150: {"resultUrls": ["https://r/1.png"]})
+    monkeypatch.setattr(kie, "baixar", lambda url, destino: destino.write_bytes(b"\x89PNG\r\n\x1a\nx") or destino)
+    kie.gerar_imagem("k", "p", "4:5", tmp_path / "a.png")
+    assert visto["e"] == {"prompt": "p", "aspect_ratio": "4:5", "output_format": "png"}
+
+
+def test_remover_fundo_valida_alfa(tmp_path, monkeypatch):
+    visto = {}
+    monkeypatch.setattr(kie, "criar_tarefa", lambda chave, modelo, entrada: visto.update(m=modelo, e=entrada) or "t")
+    monkeypatch.setattr(kie, "aguardar", lambda chave, tid, intervalo=3, limite=120: {"resultUrls": ["https://r/sem-fundo.png"]})
+    monkeypatch.setattr(kie, "baixar", lambda url, destino: destino.write_bytes(_png_rgba(0)) or destino)
+    destino = kie.remover_fundo("k", "https://r/1.png", tmp_path / "m.png")
+    assert destino.exists() and visto == {"m": "recraft/remove-background", "e": {"image": "https://r/1.png"}}
+
+
+def test_remover_fundo_sem_transparencia_falha_e_nao_deixa_arquivo(tmp_path, monkeypatch):
+    monkeypatch.setattr(kie, "criar_tarefa", lambda *a: "t")
+    monkeypatch.setattr(kie, "aguardar", lambda chave, tid, intervalo=3, limite=120: {"resultUrls": ["https://r/x.png"]})
+    monkeypatch.setattr(kie, "baixar", lambda url, destino: destino.write_bytes(_png_rgba(255)) or destino)
+    with pytest.raises(kie.KieErro, match="transparente"):
+        kie.remover_fundo("k", "https://r/1.png", tmp_path / "m.png")
+    assert list(tmp_path.iterdir()) == []

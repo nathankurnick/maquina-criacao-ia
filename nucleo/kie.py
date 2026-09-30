@@ -1,4 +1,5 @@
 """Cliente KIE (Nano Banana pra imagem; Kling no modo avançado)."""
+import base64
 import http.client
 import json
 import os
@@ -6,12 +7,17 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
 from pathlib import Path
 
+from nucleo import png
 from nucleo.erros import MaquinaErro
 
 BASE = "https://api.kie.ai/api/v1"
 USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+UPLOAD = "https://kieai.redpandaai.co/api/file-base64-upload"
+LIMITE_UPLOAD = 8 * 1024 * 1024
+MODELO_SEM_FUNDO = "recraft/remove-background"
 
 
 class KieErro(MaquinaErro):
@@ -130,21 +136,75 @@ def _e_imagem(arq: Path) -> bool:
     return cab.startswith(_ASSINATURAS) or (cab[:4] == b"RIFF" and cab[8:12] == b"WEBP")
 
 
-def gerar_imagem(chave: str, prompt: str, proporcao: str, destino: Path, modelo: str = "nano-banana-2",
-                 limite: float = 150) -> Path:
+def enviar_arquivo(chave: str, arquivo: Path) -> str:
+    """Sobe uma imagem local pra KIE e devolve a URL pública (vale por ~1 dia)."""
+    arquivo = Path(arquivo)
+    try:
+        dados = arquivo.read_bytes()
+    except OSError as e:
+        raise KieErroPermanente(f"Não consegui ler {arquivo.name} pra enviar à KIE.") from e
+    if len(dados) > LIMITE_UPLOAD:
+        raise KieErroPermanente(f"A imagem {arquivo.name} é grande demais pra enviar à KIE (máx. 8 MB).")
+    if dados.startswith(b"\x89PNG"):
+        mime, ext = "image/png", ".png"
+    elif dados.startswith(b"\xff\xd8\xff"):
+        mime, ext = "image/jpeg", ".jpg"
+    else:
+        mime, ext = "image/webp", ".webp"
+    corpo = {"base64Data": f"data:{mime};base64,{base64.b64encode(dados).decode()}",
+             "uploadPath": "maquina", "fileName": f"{uuid.uuid4().hex}{ext}"}
+    try:
+        d = _checar(_requisitar(UPLOAD, chave, corpo))["data"]
+        url = d.get("fileUrl") or d.get("downloadUrl")
+    except (KeyError, TypeError, AttributeError) as e:
+        raise KieErro(INESPERADA) from e
+    if not isinstance(url, str) or not url.startswith("http"):
+        raise KieErro(INESPERADA)
+    return url
+
+
+def _baixar_imagem(url: str, destino: Path, validar=None, erro: str = "") -> Path:
     destino = Path(destino)
-    tid = criar_tarefa(chave, modelo, {"prompt": prompt, "aspect_ratio": proporcao, "output_format": "png"})
-    resultado = aguardar(chave, tid, intervalo=5, limite=limite)
-    urls = resultado.get("resultUrls") if isinstance(resultado, dict) else None
-    if not urls:
-        raise KieErro("A KIE terminou mas não devolveu a imagem. Tente de novo.")
     tmp = destino.with_name(f".{destino.name}.baixando")
     try:
-        baixar(urls[0], tmp)
+        baixar(url, tmp)
         if not _e_imagem(tmp):
             raise KieErro("A KIE devolveu um arquivo que não é imagem.")
+        if validar is not None and not validar(tmp.read_bytes()):
+            raise KieErro(erro or "A KIE devolveu uma imagem inesperada.")
         os.replace(tmp, destino)
     finally:
         if tmp.exists():
             tmp.unlink()
     return destino
+
+
+def gerar_imagem_url(chave: str, prompt: str, proporcao: str, referencias: "list[str] | None" = None,
+                     modelo: str = "nano-banana-2", limite: float = 150) -> str:
+    entrada = {"prompt": prompt, "aspect_ratio": proporcao, "output_format": "png"}
+    if referencias:
+        entrada["image_input"] = list(referencias)[:10]
+    tid = criar_tarefa(chave, modelo, entrada)
+    resultado = aguardar(chave, tid, intervalo=5, limite=limite)
+    urls = resultado.get("resultUrls") if isinstance(resultado, dict) else None
+    if not urls:
+        raise KieErro("A KIE terminou mas não devolveu a imagem. Tente de novo.")
+    return urls[0]
+
+
+def gerar_imagem(chave: str, prompt: str, proporcao: str, destino: Path, modelo: str = "nano-banana-2",
+                 limite: float = 150, referencias: "list[str] | None" = None) -> Path:
+    url = gerar_imagem_url(chave, prompt, proporcao, referencias=referencias, modelo=modelo, limite=limite)
+    return _baixar_imagem(url, destino)
+
+
+def remover_fundo(chave: str, url_imagem: str, destino: Path, limite: float = 120) -> Path:
+    """Recraft (na KIE) tira o fundo; o PNG só é aceito se tiver alfa e os cantos transparentes."""
+    tid = criar_tarefa(chave, MODELO_SEM_FUNDO, {"image": url_imagem})
+    resultado = aguardar(chave, tid, intervalo=3, limite=limite)
+    urls = resultado.get("resultUrls") if isinstance(resultado, dict) else None
+    if not urls:
+        raise KieErro("A KIE terminou mas não devolveu a imagem sem fundo. Tente de novo.")
+    return _baixar_imagem(urls[0], destino,
+                          validar=lambda b: png.tem_alfa(b) and png.cantos_transparentes(b),
+                          erro="A KIE devolveu a imagem sem fundo transparente.")
