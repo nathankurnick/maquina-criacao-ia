@@ -21,6 +21,7 @@ if _HOME not in sys.path:
 try:
     from nucleo.chaves import obter_chave
     from nucleo.erros import MaquinaErro, registrar_log
+    from nucleo.mockup import gerar_capa_simples, gerar_mockup
     from nucleo.netlify import publicar_pasta
     from nucleo.paletas import PALETA_PADRAO, PALETAS, paleta
     NUCLEO_OK = True
@@ -146,10 +147,14 @@ def ler_oto(pasta: Path) -> dict:
                          "área de membros da plataforma (https://…).")
     if not checkout_valido(oto["recusar_url"]):
         raise ValueError("recusar_url precisa ser um endereço https:// (a próxima página: downsell ou obrigado).")
+    oto["entregavel"] = _txt(bruto.get("entregavel"))
+    if oto["entregavel"] and not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", oto["entregavel"]):
+        raise ValueError("entregavel precisa ser o nome da pasta do entregável (só minúsculas, números e hífen).")
+    oto["nome_produto"] = _txt(bruto.get("nome_produto"))
     return oto
 
 
-def html_oto(oto: dict, paleta_nome: str) -> str:
+def html_oto(oto: dict, paleta_nome: str, mockup_src: str = "") -> str:
     cores = paleta(paleta_nome)
     variaveis = ":root{" + ";".join(f"--pg-{k}:{v}" for k, v in cores.items()) + "}"
     if oto["formato"] == "video":
@@ -157,6 +162,10 @@ def html_oto(oto: dict, paleta_nome: str) -> str:
     else:
         paragrafos = "".join(f"<p>{e(p.strip())}</p>" for p in re.split(r"\n\s*\n", oto["texto"]) if p.strip())
         miolo = f'<div class="texto">{paragrafos}</div>'
+    if mockup_src and oto["formato"] == "texto":
+        miolo = f'<img class="oto-mockup" src="{e(mockup_src)}" alt="{e(oto.get("nome_produto") or "Oferta")}">' + miolo
+    extra = (f'<img class="oto-mockup pequeno" src="{e(mockup_src)}" alt="{e(oto.get("nome_produto") or "Oferta")}">'
+             if mockup_src and oto["formato"] == "video" else "")
     if oto.get("botao_no_player"):
         botao = ""
     else:
@@ -173,7 +182,7 @@ def html_oto(oto: dict, paleta_nome: str) -> str:
             f'<meta name="robots" content="noindex"><title>{e(oto["headline"])}</title>'
             f"<style>{variaveis}\n{CSS.read_text(encoding='utf-8')}</style></head><body>"
             f'<p class="aviso">{e(oto["pre_headline"])}</p><div class="caixa"><h1>{e(oto["headline"])}</h1>'
-            f'{miolo}<p class="abaixo">{e(oto["copy_abaixo"])}</p><div id="oferta" class="{classe}">{botao}{recusar}</div>'
+            f'{miolo}<p class="abaixo">{e(oto["copy_abaixo"])}</p>{extra}<div id="oferta" class="{classe}">{botao}{recusar}</div>'
             f"</div>{script}</body></html>\n")
 
 
@@ -202,7 +211,8 @@ def _paleta_efetiva(pasta: Path, escolhida: str = "") -> str:
 
 def montar(pasta: Path, paleta_nome: str) -> Path:
     pasta = Path(pasta).resolve()
-    documento = html_oto(ler_oto(pasta), paleta_nome)
+    mockup_arq = pasta / "mockup.png"
+    documento = html_oto(ler_oto(pasta), paleta_nome, "img/mockup.png" if mockup_arq.is_file() else "")
     site, novo, antigo = pasta / "site", pasta / ".site-novo", pasta / ".site-antigo"
     if antigo.exists() and not site.exists():
         antigo.rename(site)
@@ -212,6 +222,9 @@ def montar(pasta: Path, paleta_nome: str) -> Path:
     novo.mkdir()
     try:
         (novo / "index.html").write_text(documento, encoding="utf-8")
+        if mockup_arq.is_file():
+            (novo / "img").mkdir()
+            shutil.copyfile(mockup_arq, novo / "img" / "mockup.png")
         if site.exists():
             site.rename(antigo)
         try:
@@ -269,12 +282,25 @@ def publicar(pasta: Path) -> dict:
     return {"url": r["url"], "site_id": r["site_id"], "url_anterior": anterior}
 
 
+def gerar_mockup_oto(pasta: Path, paleta_nome: str) -> dict:
+    pasta = Path(pasta).resolve()
+    oto = ler_oto(pasta)
+    capa = pasta / "entregaveis" / oto["entregavel"] / "capa.png" if oto["entregavel"] else None
+    if capa is None or not capa.is_file():
+        if not oto["nome_produto"]:
+            raise ValueError('pra gerar o mockup, ponha no oto.json o "entregavel" (pasta com capa.png em '
+                             'entregaveis/) ou o "nome_produto".')
+        capa = gerar_capa_simples(oto["nome_produto"], "Oferta especial", pasta / ".capa-oto.png", paleta_nome)
+    return gerar_mockup("livro", [capa], pasta / "mockup.png", paleta_nome, obter_chave("KIE_API_KEY"))
+
+
 def main(argv: "list[str] | None" = None) -> int:
     ap = _Parser(description="Monta (e publica) a página de upsell/downsell.")
     ap.add_argument("--pasta", required=True)
     ap.add_argument("--paleta", default="")
     ap.add_argument("--publicar", action="store_true")
     ap.add_argument("--definir-url", default="")
+    ap.add_argument("--mockup", action="store_true")
     try:
         args = ap.parse_args(argv)
     except SystemExit as s:
@@ -287,6 +313,9 @@ def main(argv: "list[str] | None" = None) -> int:
         print(f'❌ Paleta "{args.paleta}" não existe. Use: {", ".join(PALETAS)}.', file=sys.stderr)
         return 1
     pasta = Path(args.pasta).resolve()
+    if args.mockup and args.definir_url:
+        print("❌ Use --mockup sozinho; depois monte/publique a página.", file=sys.stderr)
+        return 1
     if args.definir_url and args.publicar:
         print("❌ Use um de cada vez: --definir-url (guarda o link que você publicou na mão) OU --publicar "
               "— use um de cada vez.", file=sys.stderr)
@@ -305,7 +334,16 @@ def main(argv: "list[str] | None" = None) -> int:
         if anterior and anterior != args.definir_url.strip():
             print(f"⚠️ O endereço mudou: {anterior} → {args.definir_url.strip()}. O link antigo deixou de valer: atualize na plataforma.")
         return 0
+    if args.mockup and args.publicar:
+        print("❌ Use --mockup sozinho; depois monte/publique a página.", file=sys.stderr)
+        return 1
     try:
+        if args.mockup:
+            r = gerar_mockup_oto(pasta, _paleta_efetiva(pasta, args.paleta))
+            if r["aviso"]:
+                print(f"⚠️ O mockup saiu no modo código porque a KIE falhou: {r['aviso']}")
+            print(f"✅ Mockup: {r['arquivo']}")
+            return 0
         index = montar(pasta, _paleta_efetiva(pasta, args.paleta))
         print(f"✅ Página montada: {index}")
         if not args.publicar:

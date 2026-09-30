@@ -265,3 +265,52 @@ def test_definir_url_pasta_inexistente(tmp_path, capsys):
     assert fo.main(["--pasta", str(tmp_path / "nada"), "--definir-url", "https://a.netlify.app"]) == 1
     err = capsys.readouterr().err
     assert "Não achei a pasta" in err and "Traceback" not in err
+
+
+def test_html_oto_mockup_video_fica_acima_do_botao(tmp_path):
+    oto = fo.ler_oto(_pasta(tmp_path))
+    h = fo.html_oto(oto, "azul-laranja", mockup_src="img/mockup.png")
+    assert '<img class="oto-mockup pequeno" src="img/mockup.png"' in h
+    assert h.index("youtube-nocookie") < h.index('class="oto-mockup') < h.index('id="oferta"')
+
+
+def test_html_oto_mockup_texto_fica_no_lugar_do_video(tmp_path):
+    oto = fo.ler_oto(_pasta(tmp_path, formato="texto", texto="Oferta especial."))
+    h = fo.html_oto(oto, "azul-laranja", mockup_src="img/mockup.png")
+    assert 'class="oto-mockup"' in h and h.index('class="oto-mockup"') < h.index('class="texto"')
+
+
+def test_html_oto_sem_mockup_igual(tmp_path):
+    assert 'class="oto-mockup' not in fo.html_oto(fo.ler_oto(_pasta(tmp_path)), "azul-laranja")
+
+
+def test_montar_copia_mockup(tmp_path):
+    p = _pasta(tmp_path)
+    (p / "mockup.png").write_bytes(b"\x89PNG\r\n\x1a\nm")
+    index = fo.montar(p, "azul-laranja")
+    assert (index.parent / "img" / "mockup.png").read_bytes().endswith(b"m")
+    assert 'src="img/mockup.png"' in index.read_text(encoding="utf-8")
+
+
+def test_ler_oto_entregavel_e_nome(tmp_path):
+    oto = fo.ler_oto(_pasta(tmp_path, entregavel="curso-avancado", nome_produto="Curso Avançado"))
+    assert oto["entregavel"] == "curso-avancado" and oto["nome_produto"] == "Curso Avançado"
+    assert fo.ler_oto(_pasta(tmp_path / "b"))["entregavel"] == ""
+
+
+def test_main_mockup_usa_capa_do_entregavel(tmp_path, ambiente, monkeypatch, capsys):
+    p = _pasta(tmp_path, entregavel="curso")
+    (p / "entregaveis" / "curso").mkdir(parents=True)
+    (p / "entregaveis" / "curso" / "capa.png").write_bytes(b"\x89PNG\r\n\x1a\nc")
+    visto = {}
+    monkeypatch.setattr(fo, "gerar_mockup", lambda tipo, entradas, destino, paleta_nome, chave=None, refazer=False:
+                        visto.update(tipo=tipo, entradas=entradas, destino=destino)
+                        or {"arquivo": destino, "modo": "codigo", "aviso": "", "permanente": False})
+    assert fo.main(["--pasta", str(p), "--mockup"]) == 0
+    assert visto["tipo"] == "livro" and visto["entradas"][0].name == "capa.png" and visto["destino"] == p / "mockup.png"
+
+
+def test_main_mockup_sem_capa_nem_nome_explica(tmp_path, ambiente, capsys):
+    p = _pasta(tmp_path)
+    assert fo.main(["--pasta", str(p), "--mockup"]) == 1
+    assert "entregavel" in capsys.readouterr().err
