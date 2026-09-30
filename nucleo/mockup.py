@@ -143,7 +143,8 @@ def _prompt(tipo: str, n_refs: int) -> str:
     return _PROMPT_PACK.format(bonus=bonus)
 
 
-def _hash(tipo: str, entradas: "list[Path]", paleta_nome: str) -> str:
+def _hash(tipo: str, entradas: "list[Path]", paleta_nome: str = "") -> str:
+    """Sem `paleta_nome` = hash base (a KIE não usa a paleta); com ela = hash do modo código."""
     h = hashlib.sha256(f"{tipo}|{VERSAO_PROMPT}|{paleta_nome}".encode())
     for p in entradas:
         h.update(b"|")
@@ -159,9 +160,9 @@ def _ler_cache(pasta: Path) -> dict:
         return {}
 
 
-def _gravar_cache(pasta: Path, nome: str, h: str, modo: str) -> None:
+def _gravar_cache(pasta: Path, nome: str, h: str, modo: str, base: str = "") -> None:
     c = _ler_cache(pasta)
-    c[nome] = {"hash": h, "modo": modo}
+    c[nome] = {"hash": h, "base": base, "modo": modo}
     tmp = pasta / f"{CACHE}.novo"
     tmp.write_text(json.dumps(c, ensure_ascii=False, indent=1), encoding="utf-8")
     os.replace(tmp, pasta / CACHE)
@@ -179,7 +180,8 @@ def _via_kie(tipo: str, entradas: "list[Path]", destino: Path, chave: str) -> No
     tmp.mkdir(parents=True, exist_ok=True)
     try:
         refs = []
-        for k, arq in enumerate(entradas[:1 + MAX_BONUS_PACK]):
+        limite = 1 if tipo == "livro" else 1 + MAX_BONUS_PACK
+        for k, arq in enumerate(entradas[:limite]):
             refs.append(kie.enviar_arquivo(chave, _reduzir(arq, tmp / f"ref-{k}.jpg")))
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
@@ -200,17 +202,25 @@ def gerar_mockup(tipo: str, entradas: "list[Path]", destino: Path, paleta_nome: 
         raise ValueError(f"Não achei a imagem {faltando[0] if faltando else '(nenhuma)'} pro mockup.")
     destino.parent.mkdir(parents=True, exist_ok=True)
     usa_kie = bool(chave) and tipo != "pagina"
-    h = _hash(tipo, entradas, paleta_nome)
+    h_base, h = _hash(tipo, entradas), _hash(tipo, entradas, paleta_nome)
     anterior = _ler_cache(destino.parent).get(destino.name)
-    if (not refazer and destino.exists() and isinstance(anterior, dict) and anterior.get("hash") == h
-            and (anterior.get("modo") == "kie" or not usa_kie)):
-        return {"arquivo": destino, "modo": "cache", "aviso": "", "permanente": False}
+    if not refazer and destino.exists() and isinstance(anterior, dict):
+        if anterior.get("modo") == "kie":  # a KIE não usa a paleta: trocar a paleta não repaga
+            acerto = anterior.get("base") == h_base or anterior.get("hash") == h
+        else:
+            acerto = anterior.get("hash") == h and not usa_kie
+        if acerto:
+            try:
+                os.utime(destino)  # o mockup passa a ser mais novo que as imagens de origem
+            except OSError:
+                pass
+            return {"arquivo": destino, "modo": "cache", "aviso": "", "permanente": False}
     aviso, permanente = "", False
+    feito = False
     if usa_kie:
         try:
             _via_kie(tipo, entradas, destino, chave)
-            _gravar_cache(destino.parent, destino.name, h, "kie")
-            return {"arquivo": destino, "modo": "kie", "aviso": "", "permanente": False}
+            feito = True
         except KeyboardInterrupt:
             raise
         except kie.KieErroPermanente as err:
@@ -223,6 +233,12 @@ def gerar_mockup(tipo: str, entradas: "list[Path]", destino: Path, paleta_nome: 
             except Exception:
                 pass
             aviso = "erro inesperado na KIE (detalhes no log da Máquina)"
+        if feito:
+            try:
+                _gravar_cache(destino.parent, destino.name, h, "kie", h_base)
+            except OSError:
+                pass  # sem cache só repagaria depois; o mockup pago já está pronto
+            return {"arquivo": destino, "modo": "kie", "aviso": "", "permanente": False}
     via_codigo(tipo, entradas, destino, paleta_nome)
-    _gravar_cache(destino.parent, destino.name, h, "codigo")
+    _gravar_cache(destino.parent, destino.name, h, "codigo", h_base)
     return {"arquivo": destino, "modo": "codigo", "aviso": aviso, "permanente": permanente}

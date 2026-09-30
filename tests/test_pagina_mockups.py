@@ -189,3 +189,47 @@ def test_execucao_real_mostra_estimativa_antes(tmp_path, ambiente, monkeypatch, 
     monkeypatch.setattr(pm, "gerar", lambda plano, paleta_nome, chave, refazer=False: {"modos": [], "avisos": []})
     assert pm.main(["--projeto", str(_projeto(tmp_path))]) == 0
     assert "gerações" in capsys.readouterr().out
+
+
+def test_paleta_efetiva_cadeia(tmp_path, ambiente):
+    p = _projeto(tmp_path)
+    pag = p / "pagina"
+    assert pm._paleta_efetiva(p, pag) == pm.PALETA_PADRAO
+    (p / "oferta.md").write_text("---\nnome: X\npaleta: preto-dourado\n---\ncorpo\n", encoding="utf-8")
+    assert pm._paleta_efetiva(p, pag) == "preto-dourado"
+    (pag / "config.json").write_text(json.dumps({"paleta": "verde-branco"}), encoding="utf-8")
+    assert pm._paleta_efetiva(p, pag) == "verde-branco"
+    (pag / "config.json").write_text(json.dumps({"paleta": "nao-existe"}), encoding="utf-8")
+    assert pm._paleta_efetiva(p, pag) == "preto-dourado"
+
+
+def test_main_usa_paleta_da_oferta_e_aceita_pagina(tmp_path, ambiente, monkeypatch):
+    p = _projeto(tmp_path)
+    (p / "oferta.md").write_text("---\nnome: X\npaleta: preto-dourado\n---\ncorpo\n", encoding="utf-8")
+    visto = {}
+    monkeypatch.setattr(pm, "gerar", lambda plano, paleta_nome, chave, refazer=False:
+                        visto.update(paleta=paleta_nome, saida=plano["saida"]) or {"modos": [], "avisos": []})
+    assert pm.main(["--projeto", str(p), "--sem-kie"]) == 0 and visto["paleta"] == "preto-dourado"
+    outra = p / "funil" / "extra"
+    (outra / "imagens").mkdir(parents=True)
+    (outra / "conteudo.json").write_text(json.dumps({"hero": {"headline": "X"}}), encoding="utf-8")
+    assert pm.main(["--projeto", str(p), "--pagina", str(outra), "--sem-kie"]) == 0
+    assert visto["saida"] == outra.resolve() / "imagens" / "mockups"
+
+
+def test_cache_hit_limpa_aviso_de_carrossel_velho(tmp_path, ambiente, monkeypatch):
+    import os
+    import time
+
+    import pagina_render as pr
+    from nucleo import mockup
+    p = _projeto(tmp_path, bonus=0, fotos=1, hero_entregavel="")
+    monkeypatch.setattr(mockup, "via_codigo", lambda tipo, entradas, destino, paleta_nome:
+                        destino.write_bytes(b"cod") and destino)
+    assert pm.main(["--projeto", str(p), "--sem-kie"]) == 0
+    m = p / "pagina" / "imagens" / "mockups" / "pagina-01.png"
+    velho = time.time() - 500
+    os.utime(m, (velho, velho))
+    assert pm.main(["--projeto", str(p), "--sem-kie"]) == 0  # tudo em cache
+    _, avisos = pr.montar_site(p)
+    assert not any("mudaram depois dos mockups" in a for a in avisos)

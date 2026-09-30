@@ -360,3 +360,10 @@ def test_main_mockup_so_nome_produto_usa_capa_simples(tmp_path, ambiente, monkey
                         or {"arquivo": destino, "modo": "codigo", "aviso": "", "permanente": False})
     assert fo.main(["--pasta", str(p), "--mockup"]) == 0
     assert visto["titulo"] == "Curso Top" and visto["entradas"] == [visto["capa"]]
+
+
+def test_mockup_entregavel_sem_capa_diz_onde_procurou(tmp_path, ambiente, capsys):
+    p = _pasta(tmp_path, entregavel="curso")
+    assert fo.main(["--pasta", str(p), "--mockup"]) == 1
+    err = capsys.readouterr().err
+    assert "não achei a capa" in err and "entregaveis" in err and "curso" in err

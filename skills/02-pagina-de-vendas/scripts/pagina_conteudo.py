@@ -82,9 +82,14 @@ def _texto(v, padrao: str = "") -> str:
 _SLUG = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 
 
-def _slug(v) -> str:
+def _slug(v, avisos: "list[str] | None" = None, onde: str = "") -> str:
     t = _texto(v)
-    return t if _SLUG.fullmatch(t) else ""
+    if _SLUG.fullmatch(t):
+        return t
+    if t and avisos is not None:
+        avisos.append(f'{onde}: "entregavel" inválido ("{t}") — use o nome da pasta em entregaveis/ '
+                      "(só minúsculas, números e hífen).")
+    return ""
 
 
 def _preco(v) -> str:
@@ -147,7 +152,7 @@ def normalizar(bruto: object) -> "tuple[dict, list[str]]":
     hero = {"ativo": _bool(h.get("ativo"), True), "badge": _texto(h.get("badge")),
             "headline": _texto(h.get("headline")), "subheadline": _texto(h.get("subheadline")),
             "cta": _texto(h.get("cta"), "QUERO ACESSAR AGORA"),
-            "entregavel": _slug(h.get("entregavel"))}
+            "entregavel": _slug(h.get("entregavel"), avisos, "hero")}
     if hero["ativo"] and not hero["headline"]:
         hero["ativo"] = False
         avisos.append("hero: sem headline — o topo da página não aparece.")
@@ -172,9 +177,14 @@ def normalizar(bruto: object) -> "tuple[dict, list[str]]":
         **_titulo_descricao(x)})
     incluso = com_itens("incluso", ("titulo", "nota"), _titulo_descricao)
     entrega = com_itens("entrega", ("titulo", "subtitulo"), _titulo_descricao)
-    bonus = com_itens("bonus", ("titulo", "subtitulo"), lambda x: {
-        **_titulo_descricao(x), "valor": _preco(_objeto(x).get("valor")),
-        "entregavel": _slug(_objeto(x).get("entregavel"))})
+    n_bonus = [0]
+
+    def item_bonus(x):
+        n_bonus[0] += 1
+        return {**_titulo_descricao(x), "valor": _preco(_objeto(x).get("valor")),
+                "entregavel": _slug(_objeto(x).get("entregavel"), avisos, f"bonus #{n_bonus[0]}")}
+
+    bonus = com_itens("bonus", ("titulo", "subtitulo"), item_bonus)
 
     d = bloco("depoimentos")
     depoimentos = {"ativo": _bool(d.get("ativo"), True),

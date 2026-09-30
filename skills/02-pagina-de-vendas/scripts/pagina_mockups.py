@@ -1,7 +1,7 @@
 # skills/02-pagina-de-vendas/scripts/pagina_mockups.py
 """Gera os mockups da página em <P>/pagina/imagens/mockups/: topo (pack), um por bônus e as páginas do carrossel.
 
-Uso: python pagina_mockups.py --projeto <P> [--estimar] [--sem-kie] [--refazer]
+Uso: python pagina_mockups.py --projeto <P> [--pagina <pasta da página>] [--estimar] [--sem-kie] [--refazer]
 Com a chave da KIE, topo e bônus saem da KIE com fundo transparente; sem ela (ou se falhar), montados
 por código. As páginas do carrossel são sempre montadas por código (fiéis ao material, e grátis).
 """
@@ -25,7 +25,7 @@ try:
 except Exception:  # noqa: BLE001
     NUCLEO_OK = False
 
-from pagina_conteudo import PALETA_PADRAO, ler_config, normalizar  # noqa: E402
+from pagina_conteudo import PALETA_PADRAO, PALETAS, normalizar  # noqa: E402
 from pagina_render import fotos_da_pasta  # noqa: E402
 
 MAX_PAGINAS = 6
@@ -34,7 +34,7 @@ MAX_PAGINAS = 6
 class _Parser(argparse.ArgumentParser):
     def error(self, message):
         print("❌ Comando incompleto (falta --projeto). Use: pagina_mockups.py --projeto <pasta do projeto> "
-              "[--estimar] [--sem-kie] [--refazer]", file=sys.stderr)
+              "[--pagina <pasta>] [--estimar] [--sem-kie] [--refazer]", file=sys.stderr)
         raise SystemExit(1)
 
 
@@ -56,9 +56,29 @@ def _capa(projeto: Path, slug: str) -> "Path | None":
     return capa if capa.is_file() else None
 
 
-def planejar(projeto: Path) -> dict:
+def _paleta_efetiva(projeto: Path, pagina: Path) -> str:
+    """config.json da página > paleta do oferta.md > padrão (mesma cadeia do funil_oto)."""
+    try:
+        dados = json.loads((pagina / "config.json").read_text(encoding="utf-8"))
+        nome = dados.get("paleta", "") if isinstance(dados, dict) else ""
+        if nome in PALETAS:
+            return nome
+    except (OSError, ValueError):
+        pass
+    try:
+        from nucleo.projeto import ler_oferta
+        o = ler_oferta(projeto)
+        nome = getattr(o, "paleta", "") if o else ""
+        if nome in PALETAS:
+            return nome
+    except Exception:  # noqa: BLE001
+        pass
+    return PALETA_PADRAO
+
+
+def planejar(projeto: Path, pagina: "Path | None" = None) -> dict:
     projeto = Path(projeto).resolve()
-    pagina = projeto / "pagina"
+    pagina = Path(pagina).resolve() if pagina else projeto / "pagina"
     conteudo = _ler_conteudo(pagina)
     saida = pagina / "imagens" / "mockups"
     avisos = []
@@ -177,6 +197,7 @@ def _estimativa(plano: dict, chave: "str | None") -> str:
 def main(argv: "list[str] | None" = None) -> int:
     ap = _Parser(description="Gera os mockups da página de vendas.")
     ap.add_argument("--projeto", required=True)
+    ap.add_argument("--pagina", default="")
     ap.add_argument("--estimar", action="store_true")
     ap.add_argument("--sem-kie", action="store_true")
     ap.add_argument("--refazer", action="store_true")
@@ -190,12 +211,13 @@ def main(argv: "list[str] | None" = None) -> int:
         return 1
     projeto = Path(args.projeto).resolve()
     try:
-        plano = planejar(projeto)
+        pagina = Path(args.pagina).resolve() if args.pagina else projeto / "pagina"
+        plano = planejar(projeto, pagina)
         chave = None if args.sem_kie else obter_chave("KIE_API_KEY")
         print(_estimativa(plano, chave))
         if args.estimar:
             return 0
-        paleta_nome = ler_config(projeto / "pagina").get("paleta") or PALETA_PADRAO
+        paleta_nome = _paleta_efetiva(projeto, pagina)
         print("🎨 Gerando os mockups (com a KIE, 1–2 minutos por imagem)…")
         r = gerar(plano, paleta_nome, chave, args.refazer)
     except KeyboardInterrupt:

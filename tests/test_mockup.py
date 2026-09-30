@@ -166,15 +166,63 @@ def test_cache_evita_nova_chamada_e_refazer_ignora(tmp_path, monkeypatch):
     assert k.nomes().count("gerar") == 2
 
 
-def test_cache_invalida_se_capa_ou_paleta_muda(tmp_path, monkeypatch):
+def test_cache_invalida_se_capa_muda(tmp_path, monkeypatch):
     k = _Kie(monkeypatch)
     _codigo_falso(monkeypatch)
     capa, destino = _png_real(tmp_path), tmp_path / "b.png"
     mockup.gerar_mockup("livro", [capa], destino, "azul-laranja", chave="k")
-    mockup.gerar_mockup("livro", [capa], destino, "preto-dourado", chave="k")
     capa.write_bytes(capa.read_bytes() + b"\x00")
-    mockup.gerar_mockup("livro", [capa], destino, "preto-dourado", chave="k")
-    assert k.nomes().count("gerar") == 3
+    assert mockup.gerar_mockup("livro", [capa], destino, "azul-laranja", chave="k")["modo"] == "kie"
+    assert k.nomes().count("gerar") == 2
+
+
+def test_trocar_paleta_nao_repaga_a_kie(tmp_path, monkeypatch):
+    k = _Kie(monkeypatch)
+    _codigo_falso(monkeypatch)
+    capa, destino = _png_real(tmp_path), tmp_path / "b.png"
+    assert mockup.gerar_mockup("livro", [capa], destino, "azul-laranja", chave="k")["modo"] == "kie"
+    assert mockup.gerar_mockup("livro", [capa], destino, "preto-dourado", chave="k")["modo"] == "cache"
+    assert k.nomes().count("gerar") == 1
+
+
+def test_codigo_em_cache_e_refeito_quando_a_paleta_muda(tmp_path, monkeypatch):
+    feitos = _codigo_falso(monkeypatch)
+    capa, destino = _png_real(tmp_path), tmp_path / "b.png"
+    assert mockup.gerar_mockup("livro", [capa], destino, "azul-laranja")["modo"] == "codigo"
+    assert mockup.gerar_mockup("livro", [capa], destino, "azul-laranja")["modo"] == "cache"
+    assert mockup.gerar_mockup("livro", [capa], destino, "preto-dourado")["modo"] == "codigo"
+    assert feitos == ["livro", "livro"]
+
+
+def test_cache_atualiza_a_data_do_mockup(tmp_path, monkeypatch):
+    import os
+    import time
+    _codigo_falso(monkeypatch)
+    capa, destino = _png_real(tmp_path), tmp_path / "b.png"
+    mockup.gerar_mockup("livro", [capa], destino, "azul-laranja")
+    velho = time.time() - 500
+    os.utime(destino, (velho, velho))
+    assert mockup.gerar_mockup("livro", [capa], destino, "azul-laranja")["modo"] == "cache"
+    assert destino.stat().st_mtime > velho + 100
+
+
+def test_falha_ao_gravar_cache_nao_joga_fora_o_resultado_da_kie(tmp_path, monkeypatch):
+    _Kie(monkeypatch)
+    feitos = _codigo_falso(monkeypatch)
+
+    def quebra(*a, **k):
+        raise OSError("disco cheio")
+    monkeypatch.setattr(mockup, "_gravar_cache", quebra)
+    r = mockup.gerar_mockup("livro", [_png_real(tmp_path)], tmp_path / "b.png", "azul-laranja", chave="k")
+    assert r["modo"] == "kie" and feitos == []
+
+
+def test_livro_sobe_so_a_primeira_entrada(tmp_path, monkeypatch):
+    k = _Kie(monkeypatch)
+    _codigo_falso(monkeypatch)
+    capas = [_png_real(tmp_path, "a.png"), _png_real(tmp_path, "b.png")]
+    mockup.gerar_mockup("livro", capas, tmp_path / "b.png", "azul-laranja", chave="k")
+    assert k.nomes().count("enviar") == 1
 
 
 def test_codigo_em_cache_e_refeito_quando_chega_a_chave(tmp_path, monkeypatch):

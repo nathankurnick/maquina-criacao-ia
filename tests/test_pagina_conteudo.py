@@ -209,3 +209,14 @@ def test_entregavel_no_hero_e_nos_bonus():
     c, _ = pc.normalizar(bruto)
     assert c["hero"]["entregavel"] == "pack-casas"
     assert [i["entregavel"] for i in c["bonus"]["itens"]] == ["guia-terreno", "", ""]
+
+
+def test_entregavel_malformado_avisa():
+    bruto = {"hero": {"headline": "H", "entregavel": "Guia Marmitas"},
+             "bonus": {"itens": [{"titulo": "A"}, {"titulo": "B", "entregavel": "../fora"}]}}
+    c, avisos = pc.normalizar(bruto)
+    assert c["hero"]["entregavel"] == ""
+    assert any(a.startswith('hero: "entregavel" inválido ("Guia Marmitas")') for a in avisos)
+    assert any(a.startswith('bonus #2: "entregavel" inválido') for a in avisos)
+    _, ok = pc.normalizar({"hero": {"headline": "H", "entregavel": "guia-marmitas"}})
+    assert not any("entregavel" in a for a in ok)

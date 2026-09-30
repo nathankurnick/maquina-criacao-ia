@@ -24,6 +24,8 @@ A pasta do item precisa ter `meta.json` e `conteudo.md`, como no SKILL do Sistem
 PY="$HOME/.maquina/venv/bin/python"; S3="$HOME/.claude/skills/03-entregaveis/scripts"; "$PY" "$S3/entregavel_capa.py" --pasta "<P>/funil/bump/entregaveis/<item>" --paleta '<paleta>' --arte '<descrição visual, sem texto>'
 ```
 
+O `--arte` gasta crédito da KIE (são 4 bumps, então 4 capas): mostre o custo ao aluno e peça o ok antes; se ele não quiser gastar, rode o comando sem o `--arte`.
+
 ```bash
 PY="$HOME/.maquina/venv/bin/python"; S3="$HOME/.claude/skills/03-entregaveis/scripts"; "$PY" "$S3/entregavel_pdf.py" --pasta "<P>/funil/bump/entregaveis/<item>" --paleta '<paleta>'
 ```

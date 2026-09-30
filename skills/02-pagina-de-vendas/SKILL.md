@@ -52,9 +52,35 @@ preço e garantia, e peça a aprovação dele antes de seguir. Ajuste o que ele 
 bloco (edite só aquele bloco no JSON).
 
 A IA não inventa prova (depoimento, nome de cliente, nota, número de alunos). Depoimento só
-entra como print real do aluno (Passo 3).
+entra como print real do aluno (Passo 4).
 
-## Passo 3 — Imagens e mockups
+## Passo 3 — Paleta e pixels
+
+Mostre as paletas e pergunte qual:
+
+```bash
+PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/02-pagina-de-vendas/scripts"; "$PY" "$S/pagina_config.py" --projeto "<P>" --paletas
+```
+
+```bash
+PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/02-pagina-de-vendas/scripts"; "$PY" "$S/pagina_config.py" --projeto "<P>" --definir 'paleta=preto-dourado'
+```
+
+Grave a paleta também na oferta (fonte única de verdade):
+
+```bash
+M="$(command -v maquina || echo "$HOME/.local/bin/maquina")"; "$M" oferta definir <slug> paleta='<escolhida>'
+```
+
+Escolha a paleta ANTES dos mockups (o Passo 4 usa ela). Se trocar a paleta depois, rode o
+`pagina_mockups.py` de novo (o que a KIE já gerou não é cobrado outra vez).
+
+Pixels são opcionais: `--definir 'pixel_meta=<só números>'`, `--definir 'pixel_google=G-XXXX'`.
+Código extra no `<head>` (Utmify etc.): salve o trecho que o aluno colar em `<P>/pagina/head.html`
+(fora da pasta `site/`, que é recriada a cada montagem) e use `--head-arquivo "<P>/pagina/head.html"`. SEO: `--definir 'seo_titulo=...'` e `--definir 'seo_descricao=...'`.
+Saída 1 = valor inválido (a mensagem diz o certo); nada é gravado. Saída 130 = cancelado.
+
+## Passo 4 — Imagens e mockups
 
 Pastas que o aluno pode preencher:
 
@@ -87,29 +113,6 @@ Saída 1 = `conteudo.json` ausente/quebrado ou falha ao montar (a mensagem diz).
 
 Sempre que o aluno trocar imagens do carrossel, capas do 03 ou bônus, rode o `pagina_mockups.py`
 de novo antes de montar a página.
-
-## Passo 4 — Paleta e pixels
-
-Mostre as paletas e pergunte qual:
-
-```bash
-PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/02-pagina-de-vendas/scripts"; "$PY" "$S/pagina_config.py" --projeto "<P>" --paletas
-```
-
-```bash
-PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/02-pagina-de-vendas/scripts"; "$PY" "$S/pagina_config.py" --projeto "<P>" --definir 'paleta=preto-dourado'
-```
-
-Grave a paleta também na oferta (fonte única de verdade):
-
-```bash
-M="$(command -v maquina || echo "$HOME/.local/bin/maquina")"; "$M" oferta definir <slug> paleta='<escolhida>'
-```
-
-Pixels são opcionais: `--definir 'pixel_meta=<só números>'`, `--definir 'pixel_google=G-XXXX'`.
-Código extra no `<head>` (Utmify etc.): salve o trecho que o aluno colar em `<P>/pagina/head.html`
-(fora da pasta `site/`, que é recriada a cada montagem) e use `--head-arquivo "<P>/pagina/head.html"`. SEO: `--definir 'seo_titulo=...'` e `--definir 'seo_descricao=...'`.
-Saída 1 = valor inválido (a mensagem diz o certo); nada é gravado. Saída 130 = cancelado.
 
 ## Passo 5 — Montar e ver a prévia
 
@@ -180,5 +183,5 @@ reescrever a copy): o `conteudo.json` guarda a copy e o template novo é aplicad
 
 Cada página vive na sua pasta, por exemplo `<P>/funil/upsell`, com o próprio `conteudo.json`,
 `imagens/`, `config.json` e `site/`. O link de checkout vem do que o aluno informar para aquela
-oferta (não é o `link_checkout` do oferta.md). Todo comando dos Passos 4 a 6 leva
+oferta (não é o `link_checkout` do oferta.md). Todo comando dos Passos 3 a 6 (inclusive o `pagina_mockups.py`) leva
 `--pagina "<pasta>"` depois do `--projeto`, e a prévia abre `<pasta>/site/index.html`.

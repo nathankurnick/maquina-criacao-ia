@@ -287,6 +287,9 @@ def gerar_mockup_oto(pasta: Path, paleta_nome: str) -> dict:
     oto = ler_oto(pasta)
     capa = pasta / "entregaveis" / oto["entregavel"] / "capa.png" if oto["entregavel"] else None
     if capa is None or not capa.is_file():
+        if not oto["nome_produto"] and oto["entregavel"]:
+            raise ValueError(f'não achei a capa em {capa} — gere a capa desse entregável com o comando de capa do '
+                             'Sistema 03, ou ponha o "nome_produto" no oto.json.')
         if not oto["nome_produto"]:
             raise ValueError('pra gerar o mockup, ponha no oto.json o "entregavel" (pasta com capa.png em '
                              'entregaveis/) ou o "nome_produto".')
