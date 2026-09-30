@@ -233,3 +233,14 @@ def test_cache_hit_limpa_aviso_de_carrossel_velho(tmp_path, ambiente, monkeypatc
     assert pm.main(["--projeto", str(p), "--sem-kie"]) == 0  # tudo em cache
     _, avisos = pr.montar_site(p)
     assert not any("mudaram depois dos mockups" in a for a in avisos)
+
+
+def test_estimar_mostra_avisos_de_entregavel(tmp_path, ambiente, capsys):
+    p = _projeto(tmp_path, capa_principal=False)
+    c = json.loads((p / "pagina" / "conteudo.json").read_text(encoding="utf-8"))
+    c["bonus"]["itens"][1]["entregavel"] = "Guia Ruim"
+    (p / "pagina" / "conteudo.json").write_text(json.dumps(c), encoding="utf-8")
+    assert pm.main(["--projeto", str(p), "--estimar"]) == 0
+    out = capsys.readouterr().out
+    assert "entregaveis/pack/capa.png" in out and 'bonus #2: "entregavel" inválido ("Guia Ruim")' in out
+    assert out.count("Guia Ruim") == 1

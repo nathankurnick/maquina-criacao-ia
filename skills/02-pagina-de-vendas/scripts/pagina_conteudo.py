@@ -180,9 +180,12 @@ def normalizar(bruto: object) -> "tuple[dict, list[str]]":
     n_bonus = [0]
 
     def item_bonus(x):
-        n_bonus[0] += 1
-        return {**_titulo_descricao(x), "valor": _preco(_objeto(x).get("valor")),
-                "entregavel": _slug(_objeto(x).get("entregavel"), avisos, f"bonus #{n_bonus[0]}")}
+        base = _titulo_descricao(x)
+        if base["titulo"]:  # item sem título é descartado: não conta na numeração
+            n_bonus[0] += 1
+        return {**base, "valor": _preco(_objeto(x).get("valor")),
+                "entregavel": _slug(_objeto(x).get("entregavel"), avisos if base["titulo"] else None,
+                                    f"bonus #{n_bonus[0]}")}
 
     bonus = com_itens("bonus", ("titulo", "subtitulo"), item_bonus)
 

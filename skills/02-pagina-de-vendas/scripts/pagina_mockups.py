@@ -38,7 +38,7 @@ class _Parser(argparse.ArgumentParser):
         raise SystemExit(1)
 
 
-def _ler_conteudo(pagina: Path) -> dict:
+def _ler_conteudo(pagina: Path) -> "tuple[dict, list[str]]":
     arq = pagina / "conteudo.json"
     try:
         bruto = json.loads(arq.read_text(encoding="utf-8"))
@@ -46,7 +46,8 @@ def _ler_conteudo(pagina: Path) -> dict:
         raise ValueError(f"Não achei {arq}. Escreva a copy (conteudo.json) antes dos mockups.") from err
     except (OSError, ValueError) as err:
         raise ValueError(f"O {arq} tem um erro de formatação JSON ({err}). Corrija e rode de novo.") from err
-    return normalizar(bruto)[0]
+    conteudo, avisos = normalizar(bruto)
+    return conteudo, [a for a in avisos if "entregavel" in a]
 
 
 def _capa(projeto: Path, slug: str) -> "Path | None":
@@ -79,9 +80,8 @@ def _paleta_efetiva(projeto: Path, pagina: Path) -> str:
 def planejar(projeto: Path, pagina: "Path | None" = None) -> dict:
     projeto = Path(projeto).resolve()
     pagina = Path(pagina).resolve() if pagina else projeto / "pagina"
-    conteudo = _ler_conteudo(pagina)
+    conteudo, avisos = _ler_conteudo(pagina)
     saida = pagina / "imagens" / "mockups"
-    avisos = []
     hero = conteudo["hero"]
     principal = _capa(projeto, hero["entregavel"])
     if hero["ativo"] and hero["entregavel"] and principal is None:
@@ -162,7 +162,7 @@ def gerar(plano: dict, paleta_nome: str, chave: "str | None", refazer: bool = Fa
         for velha in capas.glob("*.png"):
             if velha.resolve() not in em_uso:
                 velha.unlink()
-    avisos = list(plano["avisos"])
+    avisos = []
     if contagem["codigo"] and falhas:
         avisos.append(f"⚠️ {contagem['codigo']} mockup(s) saíram no modo código porque a KIE falhou: {falhas[0]}")
     return {"modos": modos, "avisos": avisos}
@@ -215,6 +215,8 @@ def main(argv: "list[str] | None" = None) -> int:
         plano = planejar(projeto, pagina)
         chave = None if args.sem_kie else obter_chave("KIE_API_KEY")
         print(_estimativa(plano, chave))
+        for aviso in plano["avisos"]:
+            print(f"⚠️ {aviso}")
         if args.estimar:
             return 0
         paleta_nome = _paleta_efetiva(projeto, pagina)

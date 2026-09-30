@@ -220,3 +220,11 @@ def test_entregavel_malformado_avisa():
     assert any(a.startswith('bonus #2: "entregavel" inválido') for a in avisos)
     _, ok = pc.normalizar({"hero": {"headline": "H", "entregavel": "guia-marmitas"}})
     assert not any("entregavel" in a for a in ok)
+
+
+def test_numeracao_do_aviso_ignora_item_sem_titulo():
+    bruto = {"hero": {"headline": "H"},
+             "bonus": {"itens": [{"entregavel": "X Y"}, {"titulo": "A"}, {"titulo": "B", "entregavel": "X Y"}]}}
+    _, avisos = pc.normalizar(bruto)
+    assert [a for a in avisos if "entregavel" in a and a.startswith("bonus")] == [
+        'bonus #2: "entregavel" inválido ("X Y") — use o nome da pasta em entregaveis/ (só minúsculas, números e hífen).']

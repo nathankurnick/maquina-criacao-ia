@@ -73,7 +73,7 @@ M="$(command -v maquina || echo "$HOME/.local/bin/maquina")"; "$M" oferta defini
 ```
 
 Escolha a paleta ANTES dos mockups (o Passo 4 usa ela). Se trocar a paleta depois, rode o
-`pagina_mockups.py` de novo (o que a KIE já gerou não é cobrado outra vez).
+`pagina_mockups.py` de novo (o que a KIE já gerou não é cobrado outra vez, exceto bônus com capa simples se a paleta mudar).
 
 Pixels são opcionais: `--definir 'pixel_meta=<só números>'`, `--definir 'pixel_google=G-XXXX'`.
 Código extra no `<head>` (Utmify etc.): salve o trecho que o aluno colar em `<P>/pagina/head.html`
