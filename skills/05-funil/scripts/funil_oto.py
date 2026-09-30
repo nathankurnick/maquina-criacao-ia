@@ -163,8 +163,8 @@ def html_oto(oto: dict, paleta_nome: str, mockup_src: str = "") -> str:
         paragrafos = "".join(f"<p>{e(p.strip())}</p>" for p in re.split(r"\n\s*\n", oto["texto"]) if p.strip())
         miolo = f'<div class="texto">{paragrafos}</div>'
     if mockup_src and oto["formato"] == "texto":
-        miolo = f'<img class="oto-mockup" src="{e(mockup_src)}" alt="{e(oto.get("nome_produto") or "Oferta")}">' + miolo
-    extra = (f'<img class="oto-mockup pequeno" src="{e(mockup_src)}" alt="{e(oto.get("nome_produto") or "Oferta")}">'
+        miolo = f'<img class="oto-mockup" src="{e(mockup_src)}" alt="{e(oto.get("nome_produto") or "Oferta")}" width="1200" height="1200">' + miolo
+    extra = (f'<img class="oto-mockup pequeno" src="{e(mockup_src)}" alt="{e(oto.get("nome_produto") or "Oferta")}" width="1200" height="1200">'
              if mockup_src and oto["formato"] == "video" else "")
     if oto.get("botao_no_player"):
         botao = ""
@@ -290,6 +290,7 @@ def gerar_mockup_oto(pasta: Path, paleta_nome: str) -> dict:
         if not oto["nome_produto"]:
             raise ValueError('pra gerar o mockup, ponha no oto.json o "entregavel" (pasta com capa.png em '
                              'entregaveis/) ou o "nome_produto".')
+        # .capa-oto.png fica de propósito: é a entrada do cache do mockup (gerar_mockup reaproveita pelo hash dela)
         capa = gerar_capa_simples(oto["nome_produto"], "Oferta especial", pasta / ".capa-oto.png", paleta_nome)
     return gerar_mockup("livro", [capa], pasta / "mockup.png", paleta_nome, obter_chave("KIE_API_KEY"))
 
