@@ -470,3 +470,40 @@ def test_nao_copia_mockups_de_secao_inativa(tmp_path):
     index, _ = pr.montar_site(p)
     assert not (index.parent / "img" / "mockup-bonus-1.png").exists()
     assert not (index.parent / "img" / "carrossel-01.png").exists()
+
+
+def test_depoimento_nao_distorce_no_celular(tmp_path):
+    pytest.importorskip("playwright")
+    from playwright.sync_api import sync_playwright
+    import struct
+    import zlib
+
+    def chunk(t, d):
+        return struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d))
+
+    w, h = 300, 600
+    png = (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 6, 0, 0, 0))
+           + chunk(b"IDAT", zlib.compress((b"\x00" + b"\x80" * 4 * w) * h)) + chunk(b"IEND", b""))
+    p = tmp_path / "proj"
+    pag = p / "pagina"
+    (pag / "imagens" / "depoimentos").mkdir(parents=True)
+    (pag / "imagens" / "depoimentos" / "a.png").write_bytes(png)
+    (pag / "conteudo.json").write_text(json.dumps({"hero": {"headline": "H"}, "depoimentos": {"titulo": "D"}}),
+                                       encoding="utf-8")
+    index, _ = pr.montar_site(p)
+    try:
+        with sync_playwright() as pw:
+            nav = pw.chromium.launch()
+            pg = nav.new_page(viewport={"width": 390, "height": 844})
+            pg.goto(index.as_uri())
+            pg.wait_for_selector(".depoimentos img", state="attached")
+            pg.evaluate("document.querySelector('.depoimentos img').scrollIntoView()")
+            pg.wait_for_timeout(300)
+            caixa = pg.evaluate("(() => {const r = document.querySelector('.depoimentos img').getBoundingClientRect();"
+                                "return [r.width, r.height];})()")
+            nav.close()
+    except Exception as e:
+        if "Executable doesn't exist" in str(e):
+            pytest.skip("Chromium do Playwright não instalado")
+        raise
+    assert caixa[0] > 0 and abs(caixa[1] / caixa[0] - 2.0) < 0.05

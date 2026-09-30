@@ -122,9 +122,6 @@ def _dimensoes(arq: Path) -> "tuple[int, int] | None":
     return None
 
 
-_dimensoes_png = _dimensoes
-
-
 def _tam(src: str, tamanhos: dict) -> str:
     wh = tamanhos.get(src)
     return f' width="{wh[0]}" height="{wh[1]}"' if wh else ""
@@ -213,7 +210,9 @@ def _bonus(b, mockups=None, tamanhos=None):
 def _depoimentos(b, imagens, tamanhos=None):
     if not b["ativo"] or not imagens:
         return ""
-    fotos = "".join(f'<img src="{e(src)}" alt="Depoimento de aluno {i}"{_tam(src, tamanhos or {})} loading="lazy">' for i, src in enumerate(imagens, 1))
+    fotos = "".join(
+        f'<img src="{e(src)}" alt="Depoimento de aluno {i}"{_tam(src, tamanhos or {})} loading="lazy">'
+        for i, src in enumerate(imagens, 1))
     return _secao("clara", f'<div class="caixa">{_cabeca(b)}<div class="grade grade-2 grade-3l depoimentos">{fotos}</div></div>')
 
 
@@ -387,11 +386,10 @@ def _montar(pagina, conteudo, config, avisos, site, novo, rel="pagina"):
 
     if conteudo["hero"]["ativo"] and (mockups / "topo.png").is_file():
         imagens["topo"] = copiar(mockups / "topo.png", "mockup-topo.png")
-    for n in range(1, len(conteudo["bonus"]["itens"]) + 1):
-        if not conteudo["bonus"]["ativo"]:
-            break
-        if (mockups / f"bonus-{n}.png").is_file():
-            imagens["bonus"][n] = copiar(mockups / f"bonus-{n}.png", f"mockup-bonus-{n}.png")
+    if conteudo["bonus"]["ativo"]:
+        for n in range(1, len(conteudo["bonus"]["itens"]) + 1):
+            if (mockups / f"bonus-{n}.png").is_file():
+                imagens["bonus"][n] = copiar(mockups / f"bonus-{n}.png", f"mockup-bonus-{n}.png")
     brutas = fotos_da_pasta(pagina / "imagens" / "carrossel")
     paginas = sorted(mockups.glob("pagina-[0-9][0-9].png")) if mockups.is_dir() and conteudo["carrossel"]["ativo"] else []
     if paginas:

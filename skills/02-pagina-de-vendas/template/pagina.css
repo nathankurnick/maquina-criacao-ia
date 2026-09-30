@@ -2,7 +2,7 @@
 *,*::before,*::after{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
 body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.5;color:var(--pg-texto-escuro);background:#fff;overflow-wrap:anywhere}
-img{max-width:100%;display:block}
+img{max-width:100%;height:auto;display:block}
 h1,h2,h3,p{margin:0}
 .secao{padding:48px 16px}
 .escura{background:var(--pg-fundo);color:var(--pg-texto-claro)}
