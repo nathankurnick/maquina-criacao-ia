@@ -1,0 +1,27 @@
+/* Cenas dos mockups (fundo transparente). Cores vêm das variáveis --pg-* da paleta. */
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;background:transparent}
+.palco{position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;background:transparent}
+.cena{perspective:2400px}
+.livro{position:relative;width:600px;height:849px;transform:rotateY(26deg) rotateX(-6deg);transform-style:preserve-3d}
+.livro .frente{position:absolute;inset:0;background-size:100% 100%;background-position:center;border-radius:2px 8px 8px 2px;box-shadow:inset 8px 0 14px rgba(0,0,0,.28),inset -2px 0 4px rgba(255,255,255,.12)}
+.livro .lombada{position:absolute;top:0;left:-48px;width:48px;height:100%;transform-origin:right center;transform:rotateY(-90deg);background:linear-gradient(90deg,var(--pg-fundo-medio),var(--pg-fundo));border-left:6px solid var(--pg-destaque)}
+.sombra{position:absolute;width:640px;height:70px;bottom:110px;left:270px;background:radial-gradient(ellipse at center,rgba(0,0,0,.4),transparent 70%);filter:blur(10px)}
+/* pack: principal na frente; bônus menores atrás e dos lados */
+.pack .livro{position:absolute}
+.pack .principal{width:520px;height:736px;left:360px;top:250px;z-index:5}
+.pack .extra{width:330px;height:467px}
+.pack .extra-1{left:150px;top:300px;z-index:3;transform:rotateY(30deg) rotateX(-6deg)}
+.pack .extra-2{left:760px;top:300px;z-index:3;transform:rotateY(18deg) rotateX(-6deg)}
+.pack .extra-3{left:80px;top:560px;z-index:4;transform:rotateY(32deg) rotateX(-6deg)}
+.pack .extra-4{left:800px;top:560px;z-index:4;transform:rotateY(14deg) rotateX(-6deg)}
+.pack .sombra{width:1000px;left:100px;bottom:150px}
+/* página interna: folha branca com sombra e leve inclinação */
+.folha{display:inline-block;background:#fff;border-radius:6px;box-shadow:0 30px 60px rgba(0,0,0,.28),0 4px 12px rgba(0,0,0,.12);transform:rotate(-2.5deg);overflow:hidden}
+.folha img{display:block;max-width:640px;max-height:1040px;width:auto;height:auto}
+/* capa simples (bônus sem capa própria) */
+.capa-simples{width:1240px;height:1754px;display:flex;flex-direction:column;justify-content:center;padding:140px 120px;background:linear-gradient(160deg,var(--pg-fundo) 0%,var(--pg-fundo-medio) 100%);color:var(--pg-texto-claro);font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+.capa-simples .faixa{width:160px;height:14px;background:var(--pg-destaque);margin-bottom:56px}
+.capa-simples .rotulo{font-size:44px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--pg-destaque)}
+.capa-simples h1{margin:32px 0 0;font-size:112px;line-height:1.08;font-weight:900}
+.capa-simples h1.longo{font-size:88px}

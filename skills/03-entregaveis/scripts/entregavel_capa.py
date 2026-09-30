@@ -16,6 +16,7 @@ if _HOME not in sys.path:
 try:
     from nucleo.chaves import obter_chave
     from nucleo.erros import registrar_log
+    from nucleo.mockup import html_livro
     from nucleo.kie import KieErro, KieErroPermanente, aguardar, baixar, criar_tarefa
     from nucleo.paletas import PALETA_PADRAO, paleta
     NUCLEO_OK = True
@@ -65,10 +66,7 @@ def html_capa(meta: dict, paleta_nome: str, arte: str = "") -> str:
 
 
 def html_mockup(capa_png: str, paleta_nome: str) -> str:
-    return _doc(f"<div class=\"cena\"><div class=\"sombra\"></div><div class=\"livro\">"
-                f"<div class=\"lombada\"></div>"
-                f"<div class=\"frente\" style=\"background-image:url('{e(capa_png)}')\"></div></div></div>",
-                paleta_nome)
+    return html_livro(capa_png, paleta_nome)
 
 
 def _e_imagem(arq: Path) -> bool:
