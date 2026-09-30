@@ -314,7 +314,11 @@ passo "05: funil.json, mapa, downsell (texto) e upsell (vídeo)"
 mkdir -p "$P/funil/downsell" "$P/funil/upsell"
 cat > "$P/funil/funil.json" <<'JSON'
 {"front":    {"nome": "Marmitas Já", "preco": 27},
- "bump":     {"nome": "Lista de compras inteligente", "preco": 9.9, "conversao": 0.2},
+ "bumps": [
+   {"nome": "Lista de compras inteligente", "preco": 9.9,  "conversao": 0.2},
+   {"nome": "Planilha de custos por marmita", "preco": 12.9, "conversao": 0.2},
+   {"nome": "50 etiquetas prontas pra imprimir", "preco": 7.9,  "conversao": 0.2},
+   {"nome": "Cardápio de sobremesas fit", "preco": 14.9, "conversao": 0.15}],
  "upsell":   {"nome": "Cardápio 30 dias", "preco": 72, "conversao": 0.10},
  "downsell": {"nome": "Cardápio 15 dias", "preco": 37, "conversao": 0.10}}
 JSON

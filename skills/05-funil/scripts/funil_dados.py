@@ -5,9 +5,10 @@ import math
 import re
 from pathlib import Path
 
-REFERENCIAS = {"bump": (0.20, 0.40), "upsell": (0.10, 0.20), "downsell": (0.10, 0.20)}
+REFERENCIAS = {"bump": (0.15, 0.30), "upsell": (0.10, 0.20), "downsell": (0.10, 0.20)}
 META_AUMENTO = (25.0, 30.0)
-ETAPAS = ("bump", "upsell", "downsell")
+N_BUMPS = 4
+ETAPAS = ("upsell", "downsell")
 
 
 def preco(v) -> float:
@@ -55,7 +56,7 @@ def conversao(v, etapa: str) -> float:
     return numero
 
 
-def _etapa(bruto, nome_etapa: str, com_conversao: bool) -> dict:
+def _etapa(bruto, nome_etapa: str, com_conversao: bool, ref: str = "") -> dict:
     if not isinstance(bruto, dict):
         raise ValueError(f'"{nome_etapa}" precisa ser um objeto com nome e preco.')
     nome = bruto.get("nome").strip() if isinstance(bruto.get("nome"), str) else ""
@@ -68,7 +69,7 @@ def _etapa(bruto, nome_etapa: str, com_conversao: bool) -> dict:
     d = {"nome": nome, "preco": valor}
     if com_conversao:
         try:
-            d["conversao"] = conversao(bruto.get("conversao"), nome_etapa)
+            d["conversao"] = conversao(bruto.get("conversao"), ref or nome_etapa)
         except ValueError as err:
             raise ValueError(f'"{nome_etapa}": {err}.') from err
     return d
@@ -87,6 +88,17 @@ def ler_funil(pasta_funil: Path) -> dict:
     if not isinstance(dados, dict) or "front" not in dados:
         raise ValueError(f"O {arq} precisa ter o \"front\" (nome e preco do produto principal).")
     funil = {"front": _etapa(dados["front"], "front", False)}
+    if "bump" in dados and "bumps" not in dados:
+        raise ValueError('O funil agora tem 4 order bumps: troque "bump" por "bumps", uma lista com os 4 '
+                         "(nome, preco e conversao de cada).")
+    bumps = dados.get("bumps")
+    if not isinstance(bumps, list) or len(bumps) != N_BUMPS:
+        raise ValueError(f'"bumps" precisa ser uma lista com os {N_BUMPS} order bumps do checkout '
+                         "(nome, preco e conversao de cada).")
+    funil["bumps"] = [_etapa(b, f"bump {n}", True, ref="bump") for n, b in enumerate(bumps, 1)]
+    nomes = [b["nome"].casefold() for b in funil["bumps"]]
+    if len(set(nomes)) != N_BUMPS:
+        raise ValueError(f"Os {N_BUMPS} order bumps precisam ser ofertas diferentes (há nomes repetidos).")
     for etapa in ETAPAS:
         funil[etapa] = _etapa(dados[etapa], etapa, True) if dados.get(etapa) is not None else None
     if funil["downsell"] and not funil["upsell"]:
@@ -97,8 +109,7 @@ def ler_funil(pasta_funil: Path) -> dict:
 def projetar(funil: dict) -> dict:
     front = funil["front"]["preco"]
     partes = [{"etapa": "front", "nome": funil["front"]["nome"], "valor": front}]
-    if funil.get("bump"):
-        b = funil["bump"]
+    for b in funil.get("bumps") or []:
         partes.append({"etapa": "bump", "nome": b["nome"], "valor": b["preco"] * b["conversao"]})
     if funil.get("upsell"):
         u = funil["upsell"]

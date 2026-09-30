@@ -7,9 +7,13 @@ import funil_dados as fd
 import funil_mapa as fm
 
 
+def _bumps(conv=0.2, preco=9.9):
+    return [{"nome": f"Bump {n}", "preco": preco, "conversao": conv} for n in range(1, 5)]
+
+
 def _funil(**troca):
     base = {"front": {"nome": "Marmitas <Já>", "preco": 27},
-            "bump": {"nome": "Lista", "preco": 9.9, "conversao": 0.3},
+            "bumps": _bumps(conv=0.2),
             "upsell": {"nome": "Cardápio 30", "preco": 67, "conversao": 0.15},
             "downsell": {"nome": "Cardápio 15", "preco": 37, "conversao": 0.15}}
     base.update(troca)
@@ -26,7 +30,7 @@ def test_html_mapa_completo(tmp_path):
     h = fm.html_mapa(f, fd.projetar(f), "preto-dourado")
     assert "Marmitas &lt;Já&gt;" in h and "R$ 27,00" in h and "R$ 67,00" in h
     assert "Order bump" in h and "Upsell" in h and "Downsell" in h and "recusou" in h
-    assert "referência: 20–40%" in h and "referência: 10–20%" in h
+    assert "referência: 15–30%" in h and "referência: 10–20%" in h
     assert "--pg-destaque:#d4af37" in h and "Área de membros" in h
     assert fd.brl(fd.projetar(f)["ticket_medio"]) in h
 
@@ -34,7 +38,7 @@ def test_html_mapa_completo(tmp_path):
 def test_meta_atingida_ou_nao(tmp_path):
     alto = _ler(tmp_path, _funil())
     assert "✅" in fm.html_mapa(alto, fd.projetar(alto), "azul-laranja")
-    so_front = _ler(tmp_path, {"front": {"nome": "F", "preco": 27}})
+    so_front = _ler(tmp_path, {"front": {"nome": "F", "preco": 27}, "bumps": _bumps()})
     h = fm.html_mapa(so_front, fd.projetar(so_front), "azul-laranja")
     assert "Sem upsell ainda" in h and "abaixo da meta" not in h and ">Upsell<" not in h
 
@@ -68,19 +72,19 @@ def test_main_erros(tmp_path, capsys):
     assert "azul-laranja" in capsys.readouterr().err
 
 
-def _html(tmp_path, upsell_conv=0.15, bump_conv=0.3, preco_up=67):
+def _html(tmp_path, upsell_conv=0.15, bump_conv=0.2, preco_up=67):
     f = _ler(tmp_path, _funil(upsell={"nome": "U", "preco": preco_up, "conversao": upsell_conv},
-                              bump={"nome": "B", "preco": 9.9, "conversao": bump_conv}))
+                              bumps=_bumps(conv=bump_conv)))
     return fm.html_mapa(f, fd.projetar(f), "azul-laranja")
 
 
 def _up(preco_up, conv=0.10, **extra):
-    return {"front": {"nome": "F", "preco": 100}, "upsell": {"nome": "U", "preco": preco_up, "conversao": conv}, **extra}
+    return {"front": {"nome": "F", "preco": 100}, "bumps": _bumps(), "upsell": {"nome": "U", "preco": preco_up, "conversao": conv}, **extra}
 
 
 def test_faixas_do_resumo(tmp_path):
-    # bump grande sozinho NÃO conta: a meta vale só para o upsell
-    baixo = _ler(tmp_path, {"front": {"nome": "F", "preco": 100}, "bump": {"nome": "B", "preco": 90, "conversao": 0.3}})
+    # bumps grandes sozinhos NÃO contam: a meta vale só para o upsell
+    baixo = _ler(tmp_path, {"front": {"nome": "F", "preco": 100}, "bumps": _bumps(conv=0.3, preco=90)})
     h = fm.html_mapa(baixo, fd.projetar(baixo), "azul-laranja")
     assert "Sem upsell ainda — a meta de 25–30% é do upsell." in h and "abaixo da meta" not in h
     meio = _ler(tmp_path, _up(275))
@@ -92,10 +96,10 @@ def test_faixas_do_resumo(tmp_path):
 
 
 def test_resumo_separa_upsell_e_total(tmp_path):
-    f = _ler(tmp_path, _up(275, bump={"nome": "B", "preco": 50, "conversao": 0.4}))
+    f = _ler(tmp_path, _up(275, bumps=_bumps(conv=0.1, preco=50)))
     p = fd.projetar(f)
     h = fm.html_mapa(f, p, "azul-laranja")
-    assert "Ticket médio projetado (produto + bump + upsell + downsell)" in h
+    assert "Ticket médio projetado (produto + 4 bumps + upsell + downsell)" in h
     assert "Aumento total sobre o produto principal: 48%" in h
     assert "Aumento do upsell: 28%" in h and "dentro da meta de 25–30%" in h
     assert h.count("da meta") == 1  # o total não leva selo de meta
@@ -103,7 +107,11 @@ def test_resumo_separa_upsell_e_total(tmp_path):
 
 def test_exemplo_do_skill_cai_na_faixa(tmp_path):
     f = _ler(tmp_path, {"front": {"nome": "Marmitas Já", "preco": 27},
-                        "bump": {"nome": "Lista", "preco": 9.9, "conversao": 0.2},
+                        "bumps": [
+                            {"nome": "Lista de compras inteligente", "preco": 9.9, "conversao": 0.2},
+                            {"nome": "Planilha de custos por marmita", "preco": 12.9, "conversao": 0.2},
+                            {"nome": "50 etiquetas prontas pra imprimir", "preco": 7.9, "conversao": 0.2},
+                            {"nome": "Cardápio de sobremesas fit", "preco": 14.9, "conversao": 0.15}],
                         "upsell": {"nome": "Cardápio 30 dias", "preco": 72, "conversao": 0.10},
                         "downsell": {"nome": "Cardápio 15 dias", "preco": 37, "conversao": 0.10}})
     p = fd.projetar(f)
@@ -115,7 +123,7 @@ def test_fora_da_referencia(tmp_path):
     assert "fora da referência" not in _html(tmp_path)
     h = _html(tmp_path, upsell_conv=0.5)
     assert h.count("fora da referência") == 1
-    assert h.count("fora da referência") == _html(tmp_path, bump_conv=0.9).count("fora da referência")
+    assert _html(tmp_path, bump_conv=0.9).count("fora da referência") == 4
 
 
 def test_pct_abaixo_de_1():
@@ -132,3 +140,12 @@ def test_paleta_da_oferta_md(tmp_path, monkeypatch):
     (p / "oferta.md").write_text("---\n: quebrado [\n---\n", encoding="utf-8")
     assert fm._paleta_oferta(p) == ""
     assert fm._paleta_oferta(tmp_path / "nada") == ""
+
+
+def test_mapa_mostra_os_4_bumps(tmp_path):
+    f = _ler(tmp_path, {"front": {"nome": "F", "preco": 27},
+                        "bumps": [{"nome": f"Extra {n}", "preco": 9.9, "conversao": 0.2} for n in range(1, 5)]})
+    h = fm.html_mapa(f, fd.projetar(f), "azul-laranja")
+    assert h.count('class="caixa oferta"') == 4 and 'class="linha bumps"' in h
+    assert "Order bump 1" in h and "Order bump 4" in h and "Extra 3" in h
+    assert "Ticket médio projetado (produto + 4 bumps + upsell + downsell)" in h

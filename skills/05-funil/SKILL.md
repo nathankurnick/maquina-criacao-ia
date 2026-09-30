@@ -1,6 +1,6 @@
 ---
 name: 05-funil
-description: "Sistema 05 da Máquina Criação IA — Funil de Vendas. Monta o funil low ticket (anúncio → página → checkout com order bump → upsell → downsell → obrigado), projeta o ticket médio em código, cria bump, upsell e downsell pelo método Segredos do Upsell (oferta, nome, copy em 5 blocos), gera e publica as páginas de upsell/downsell, escreve e-mails e WhatsApp de recuperação e pós-compra, o checklist da plataforma e ideias de próximo produto. Use quando o aluno pedir /05-funil, 'montar o funil', 'order bump', 'upsell', 'downsell', 'página de obrigado', 'aumentar o ticket médio', 'recuperação de carrinho' ou 'e-mails pós-compra'."
+description: "Sistema 05 da Máquina Criação IA — Funil de Vendas. Monta o funil low ticket (anúncio → página → checkout com 4 order bumps → upsell → downsell → obrigado), projeta o ticket médio em código, cria os 4 bumps, upsell e downsell pelo método Segredos do Upsell (oferta, nome, copy em 5 blocos), gera e publica as páginas de upsell/downsell, escreve e-mails e WhatsApp de recuperação e pós-compra, o checklist da plataforma e ideias de próximo produto. Use quando o aluno pedir /05-funil, 'montar o funil', 'order bump', 'upsell', 'downsell', 'página de obrigado', 'aumentar o ticket médio', 'recuperação de carrinho' ou 'e-mails pós-compra'."
 ---
 
 # Sistema 05 — Funil de Vendas
@@ -43,7 +43,7 @@ copy). O `front.preco` do `funil.json` precisa ser IGUAL ao preço que está no 
 
 Pela pergunta-mestra do método ("qual é a próxima etapa lógica?"), proponha:
 
-- **Order bump** (`referencias/order-bump.md`): 20–50% do preço do produto principal.
+- **4 order bumps** (`referencias/order-bump.md`): todo funil tem 4, cada um 20–50% do preço do produto principal e resolvendo uma coisa DIFERENTE (ex.: checklist, planilha, templates, versão em áudio). Proponha 6–8 ideias e deixe o aluno escolher 4.
 - **Upsell** ⭐: 2–4 ideias nos 3 tipos (mais do mesmo / resultados mais rápidos / done for you),
   cada uma com problema que resolve, congruência com o produto principal e ticket de 2,5–3,5×.
 - **Downsell**: versão menor/mais barata do upsell pra quem recusou.
@@ -52,7 +52,11 @@ Pare e espere o aluno escolher. Depois grave `<P>/funil/funil.json` (crie a past
 
 ```json
 {"front":    {"nome": "Marmitas Já", "preco": 27},
- "bump":     {"nome": "Lista de compras inteligente", "preco": 9.9, "conversao": 0.2},
+ "bumps": [
+   {"nome": "Lista de compras inteligente", "preco": 9.9,  "conversao": 0.2},
+   {"nome": "Planilha de custos por marmita", "preco": 12.9, "conversao": 0.2},
+   {"nome": "50 etiquetas prontas pra imprimir", "preco": 7.9,  "conversao": 0.2},
+   {"nome": "Cardápio de sobremesas fit", "preco": 14.9, "conversao": 0.15}],
  "upsell":   {"nome": "Cardápio 30 dias", "preco": 72, "conversao": 0.10},
  "downsell": {"nome": "Cardápio 15 dias", "preco": 37, "conversao": 0.10}}
 ```
@@ -66,6 +70,7 @@ Regras dos números (o script confere e rejeita o que não entende):
 - `conversao` é opcional (sem ela, usa o meio da faixa de referência). Escreva `0.3`, `"30%"`
   ou `"1%"`. O valor `1` puro é rejeitado por ser ambíguo (1% ou 100%?): escreva `"1%"` ou
   `0.01` para 1%, `"100%"` para 100%.
+- `bumps` precisa ter exatamente 4 ofertas, com nomes diferentes. Referência de conversão por bump: 15–30%.
 - O downsell só existe se houver upsell.
 
 Desenhe o mapa (a paleta vem do argumento `--paleta`, senão do `pagina/config.json`, senão do
@@ -76,7 +81,7 @@ PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/05-funil/scripts"; 
 ```
 
 Abra e mostre `<P>/funil/mapa.png` (e, se quiser, o `mapa.html` ao lado). O mapa mostra o ticket
-médio projetado (produto + bump + upsell + downsell) e o aumento total, SEM rótulo de meta. A meta
+médio projetado (produto + 4 bumps + upsell + downsell) e o aumento total, SEM rótulo de meta. A meta
 do método vale só para o UPSELL (conversão do upsell × ticket do upsell ÷ preço do produto
 principal): abaixo de 25% é "abaixo da meta"; de 25% a 30% é "dentro da meta"; acima de 30% é
 "acima da meta" e o mapa pede para conferir se as conversões não estão otimistas. Conversão fora
@@ -85,11 +90,9 @@ oferta. Os números são
 referência — o aluno troca pelos dele quando tiver dados. Saída 0: ok. Saída 1: mostre a
 mensagem e corrija o `funil.json`. Saída 130: o aluno cancelou (Ctrl+C), sem problema.
 
-## Passo 3 — Order bump
+## Passo 3 — Os 4 order bumps
 
-Escreva `<P>/funil/order-bump.md` (nome, preço, copy do checkout). O conteúdo do bump é um
-produto SEPARADO: siga `referencias/order-bump.md` (pasta `<P>/funil/bump/entregaveis/<item>/`,
-nunca `maquina oferta adicionar`, nunca `--carrossel`).
+Escreva `<P>/funil/order-bump.md` com os 4 bumps (nome, preço e copy de checkout de cada). Cada bump é um produto SEPARADO com a própria pasta em `<P>/funil/bump/entregaveis/<item>/` — siga `referencias/order-bump.md` (nunca `maquina oferta adicionar`, nunca `--carrossel`).
 
 ## Passo 4 — Upsell (e downsell) pelo método ✋ CHECKPOINTS
 
@@ -140,15 +143,6 @@ Página do upsell — escreva `<P>/funil/upsell/oto.json`:
 - `formato: "texto"` + campo `texto` (parágrafos separados por linha em branco) pra upsell em texto.
 - `"entregavel"` (opcional): pasta em `<P>/funil/upsell/entregaveis/` com `capa.png`; `"nome_produto"`
   (opcional): nome do produto, usado quando não há pasta de entregável.
-
-Mockup do produto (opcional, recomendado): com o `entregavel` (ou o `nome_produto`) no `oto.json`,
-gere o mockup. Com a chave da KIE custa 1 geração + 1 remoção de fundo; avise o aluno antes.
-
-```bash
-PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/05-funil/scripts"; "$PY" "$S/funil_oto.py" --pasta "<P>/funil/upsell" --mockup
-```
-
-No formato vídeo o mockup aparece pequeno acima do botão; no formato texto, no lugar do vídeo.
 - `botao_no_player: true`: para players (VTurb) cujo botão aparece DENTRO do vídeo; a página não
   desenha botão próprio (só o "não, obrigado") e `checkout_url` deixa de ser obrigatório.
 - `botao_html`: se a plataforma der um botão de compra em 1 clique, cole o código aqui (aí o
@@ -159,6 +153,15 @@ No formato vídeo o mockup aparece pequeno acima do botão; no formato texto, no
 - Formato `texto`: `copy_abaixo` já vem como "Leia a mensagem acima até o final — seu acesso
   aparece em seguida.".
 - Paleta: `--paleta`, senão `pagina/config.json`, senão a do `oferta.md`, senão `azul-laranja`.
+
+Mockup do produto (opcional, recomendado): com o `entregavel` (ou o `nome_produto`) no `oto.json`,
+gere o mockup. Com a chave da KIE custa 1 geração + 1 remoção de fundo; mostre o custo e peça o ok do aluno antes de gastar crédito da KIE.
+
+```bash
+PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/05-funil/scripts"; "$PY" "$S/funil_oto.py" --pasta "<P>/funil/upsell" --mockup
+```
+
+No formato vídeo o mockup aparece pequeno acima do botão; no formato texto, no lugar do vídeo.
 
 O comando sempre monta a pasta `site/` (`<P>/funil/upsell/site/index.html`); só publica com
 `--publicar`. Monte, olhe e publique:

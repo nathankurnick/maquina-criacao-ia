@@ -89,3 +89,10 @@ def test_exemplo_do_oto_json_e_valido(tmp_path):
 def test_mockup_do_oto_documentado():
     t = _texto()
     assert "--mockup" in t and '"entregavel"' in t
+
+
+def test_quatro_bumps_no_skill():
+    t = _texto()
+    assert '"bumps"' in t and "4 order bumps" in t
+    exemplo = json.loads(re.search(r"```json\n(\{\"front\".*?)```", t, re.S).group(1))
+    assert len(exemplo["bumps"]) == 4

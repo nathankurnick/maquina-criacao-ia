@@ -19,7 +19,7 @@ def test_preco_invalido(ruim):
         fd.preco(ruim)
 
 
-@pytest.mark.parametrize("entrada,esperado", [(0.3, 0.3), ("30%", 0.3), (30, 0.3), ("15", 0.15), (None, 0.30)])
+@pytest.mark.parametrize("entrada,esperado", [(0.3, 0.3), ("30%", 0.3), (30, 0.3), ("15", 0.15), (None, 0.225)])
 def test_conversao(entrada, esperado):
     assert fd.conversao(entrada, "bump") == pytest.approx(esperado)
 
@@ -37,32 +37,40 @@ def _gravar(tmp_path, dados):
     return tmp_path
 
 
+def _ler(tmp_path, dados):
+    return fd.ler_funil(_gravar(tmp_path, dados))
+
+
+def _bumps(conv=0.2, preco=9.9):
+    return [{"nome": f"Bump {n}", "preco": preco, "conversao": conv} for n in range(1, 5)]
+
+
 def test_ler_funil_completo_e_projecao(tmp_path):
     f = fd.ler_funil(_gravar(tmp_path, {
         "front": {"nome": "Front", "preco": 27},
-        "bump": {"nome": "Bump", "preco": 10, "conversao": 0.3},
+        "bumps": _bumps(conv=0.3, preco=10),
         "upsell": {"nome": "Up", "preco": 67, "conversao": "15%"},
         "downsell": {"nome": "Down", "preco": 37, "conversao": 0.1}}))
     assert f["front"] == {"nome": "Front", "preco": 27.0}
     assert f["upsell"]["conversao"] == pytest.approx(0.15)
     p = fd.projetar(f)
-    esperado = 27 + 10 * 0.3 + 67 * 0.15 + 37 * 0.85 * 0.1
+    esperado = 27 + 4 * 10 * 0.3 + 67 * 0.15 + 37 * 0.85 * 0.1
     assert p["ticket_medio"] == pytest.approx(esperado)
     assert p["aumento_pct"] == pytest.approx((esperado - 27) / 27 * 100)
-    assert [x["etapa"] for x in p["partes"]] == ["front", "bump", "upsell", "downsell"]
+    assert [x["etapa"] for x in p["partes"]] == ["front"] + ["bump"] * 4 + ["upsell", "downsell"]
     assert p["aumento_upsell_pct"] == pytest.approx(67 * 0.15 / 27 * 100)
 
 
 def test_ler_funil_so_front(tmp_path):
-    f = fd.ler_funil(_gravar(tmp_path, {"front": {"nome": "F", "preco": "R$ 19,90"}}))
-    assert f["bump"] is None and f["upsell"] is None and f["downsell"] is None
-    assert fd.projetar(f)["aumento_pct"] == 0
+    f = fd.ler_funil(_gravar(tmp_path, {"front": {"nome": "F", "preco": "R$ 19,90"}, "bumps": _bumps()}))
+    assert len(f["bumps"]) == 4 and f["upsell"] is None and f["downsell"] is None
+    assert fd.projetar(f)["aumento_pct"] == pytest.approx(4 * 9.9 * 0.2 / 19.9 * 100)
     assert fd.projetar(f)["aumento_upsell_pct"] == 0
 
 
 def test_aumento_upsell_ignora_bump_e_downsell(tmp_path):
     f = fd.ler_funil(_gravar(tmp_path, {
-        "front": {"nome": "F", "preco": 100}, "bump": {"nome": "B", "preco": 50, "conversao": 0.4},
+        "front": {"nome": "F", "preco": 100}, "bumps": _bumps(conv=0.4, preco=50),
         "upsell": {"nome": "U", "preco": 250, "conversao": 0.1},
         "downsell": {"nome": "D", "preco": 100, "conversao": 0.2}}))
     p = fd.projetar(f)
@@ -72,10 +80,9 @@ def test_aumento_upsell_ignora_bump_e_downsell(tmp_path):
 
 @pytest.mark.parametrize("dados,trecho", [
     ({}, "front"),
-    ({"front": {"nome": "F"}}, "preco"),
-    ({"front": {"nome": "F", "preco": 27}, "downsell": {"nome": "D", "preco": 17}}, "downsell"),
-    ({"front": {"nome": "F", "preco": 27}, "bump": {"preco": 9}}, "nome"),
-    ({"front": {"nome": "F", "preco": 27}, "bump": "sim"}, "bump"),
+    ({"front": {"nome": "F"}, "bumps": _bumps()}, "preco"),
+    ({"front": {"nome": "F", "preco": 27}, "bumps": _bumps(), "downsell": {"nome": "D", "preco": 17}}, "downsell"),
+    ({"front": {"nome": "F", "preco": 27}}, "4 order bumps"),
 ])
 def test_ler_funil_erros(tmp_path, dados, trecho):
     with pytest.raises(ValueError, match=trecho):
@@ -103,3 +110,37 @@ def test_conversao_um_ambiguo():
     assert fd.conversao(1.0, "bump") == pytest.approx(1.0)
     assert fd.conversao("0,3", "bump") == pytest.approx(0.3)
     assert fd.conversao(30, "bump") == pytest.approx(0.3)
+
+
+def test_quatro_bumps_somam_no_ticket(tmp_path):
+    f = _ler(tmp_path, {"front": {"nome": "F", "preco": 100}, "bumps": _bumps(conv=0.2, preco=10)})
+    assert len(f["bumps"]) == 4 and "bump" not in f
+    p = fd.projetar(f)
+    assert [x["etapa"] for x in p["partes"]] == ["front"] + ["bump"] * 4
+    assert p["ticket_medio"] == pytest.approx(100 + 4 * 10 * 0.2)
+
+
+@pytest.mark.parametrize("bumps,trecho", [
+    (None, "4 order bumps"),
+    ([{"nome": "A", "preco": 9}] * 3, "4 order bumps"),
+    ([{"nome": f"B{n}", "preco": 9} for n in range(5)], "4 order bumps"),
+    ([{"nome": "Igual", "preco": 9}, {"nome": "igual", "preco": 9}, {"nome": "C", "preco": 9}, {"nome": "D", "preco": 9}],
+     "diferentes"),
+    ([{"nome": "A", "preco": 9}, {"nome": "B", "preco": 9}, {"nome": "C", "preco": 9}, {"preco": 9}], "bump 4"),
+])
+def test_bumps_invalidos(tmp_path, bumps, trecho):
+    dados = {"front": {"nome": "F", "preco": 27}}
+    if bumps is not None:
+        dados["bumps"] = bumps
+    with pytest.raises(ValueError, match=trecho):
+        _ler(tmp_path, dados)
+
+
+def test_formato_antigo_explica_a_troca(tmp_path):
+    with pytest.raises(ValueError, match='troque "bump" por "bumps"'):
+        _ler(tmp_path, {"front": {"nome": "F", "preco": 27}, "bump": {"nome": "B", "preco": 9}})
+
+
+def test_conversao_padrao_do_bump_e_o_meio_da_nova_faixa(tmp_path):
+    f = _ler(tmp_path, {"front": {"nome": "F", "preco": 27}, "bumps": [{"nome": f"B{n}", "preco": 9} for n in range(4)]})
+    assert all(b["conversao"] == pytest.approx(0.225) for b in f["bumps"])

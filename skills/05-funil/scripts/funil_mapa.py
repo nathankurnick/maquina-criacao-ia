@@ -42,11 +42,11 @@ def _pct(v: float) -> str:
     return f"{v * 100:.1f}%".replace(".", ",") if 0 < v < 0.01 else f"{v * 100:.0f}%"
 
 
-def _caixa_oferta(etapa: str, d: dict) -> str:
+def _caixa_oferta(etapa: str, d: dict, rotulo: str = "") -> str:
     baixo, alto = REFERENCIAS[etapa]
     fora = (' <strong class="fora">⚠️ fora da referência</strong>'
             if not baixo - 1e-9 <= d["conversao"] <= alto + 1e-9 else "")
-    return (f'<div class="caixa oferta"><p class="etapa">{ROTULO[etapa]}</p><p class="nome">{e(d["nome"])}</p>'
+    return (f'<div class="caixa oferta"><p class="etapa">{e(rotulo or ROTULO[etapa])}</p><p class="nome">{e(d["nome"])}</p>'
             f'<p class="preco">{brl(d["preco"])}</p><p class="conv">Conversão usada: {_pct(d["conversao"])} '
             f'(referência: {baixo * 100:.0f}–{alto * 100:.0f}%){fora}</p></div>')
 
@@ -66,9 +66,11 @@ def html_mapa(funil: dict, projecao: dict, paleta_nome: str) -> str:
     partes = [_caixa("Anúncio", "Meta Ads (Sistema 04)"), _seta(),
               _caixa("Página de vendas", front["nome"], f'<p class="preco">{brl(front["preco"])}</p>'), _seta()]
     checkout = _caixa("Checkout", "Produto principal", f'<p class="preco">{brl(front["preco"])}</p>')
-    if funil.get("bump"):
-        checkout += _caixa_oferta("bump", funil["bump"])
     partes.append(f'<div class="linha">{checkout}</div>')
+    bumps = funil.get("bumps") or []
+    if bumps:
+        caixas = "".join(_caixa_oferta("bump", b, f"Order bump {n}") for n, b in enumerate(bumps, 1))
+        partes += [_seta("no mesmo checkout"), f'<div class="linha bumps">{caixas}</div>']
     if funil.get("upsell"):
         partes += [_seta("comprou"), f'<div class="linha">{_caixa_oferta("upsell", funil["upsell"])}</div>']
         if funil.get("downsell"):
@@ -86,7 +88,7 @@ def html_mapa(funil: dict, projecao: dict, paleta_nome: str) -> str:
         selo, fim = "✅ acima da meta", " — confira se as conversões não estão otimistas"
     linha_up = (f"Sem upsell ainda — a meta de {META_AUMENTO[0]:.0f}–{META_AUMENTO[1]:.0f}% é do upsell." if sem_upsell
                 else f"Aumento do upsell: {aumento:.0f}% — {selo} de {META_AUMENTO[0]:.0f}–{META_AUMENTO[1]:.0f}%{fim}")
-    resumo = (f'<div class="resumo"><p class="grande">Ticket médio projetado (produto + bump + upsell + downsell): '
+    resumo = (f'<div class="resumo"><p class="grande">Ticket médio projetado (produto + {len(bumps)} bumps + upsell + downsell): '
               f'<span>{brl(projecao["ticket_medio"])}</span></p>'
               f'<p>Aumento total sobre o produto principal: {projecao["aumento_pct"]:.0f}%</p>'
               f'<p>{linha_up}</p>'

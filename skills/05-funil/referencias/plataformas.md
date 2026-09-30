@@ -6,7 +6,7 @@ pelo termo entre aspas. Quem configura é o aluno; você explica e confere.
 ## Em qualquer plataforma
 1. Produto principal criado, com preço e a área de membros com os entregáveis (Sistema 03).
 2. Página de vendas (Sistema 02) com o link de checkout do produto principal.
-3. **Order bump** ("order bump") ligado ao produto principal, com a copy do `order-bump.md`.
+3. **4 order bumps** ligados ao produto principal (4 produtos separados), com a copy de cada um do `order-bump.md`.
 4. **Upsell** ("upsell", "one click", "funil de vendas"): produto do upsell criado; a página de
    upsell (link da Netlify do `funil_oto.py`) configurada como página depois da compra; o botão
    de compra em 1 clique da plataforma (se existir) colado em `botao_html` do `oto.json` (se o botão
@@ -21,11 +21,11 @@ pelo termo entre aspas. Quem configura é o aluno; você explica e confere.
    reembolso depois.
 
 ## Kiwify / Hotmart / Payt / Eduzz
-Todas têm order bump e upsell pós-compra; os nomes exatos mudam. Termos pra buscar na ajuda:
+Todas têm order bump (use os 4) e upsell pós-compra; os nomes exatos mudam. Termos pra buscar na ajuda:
 "order bump", "upsell de 1 clique", "funil", "página de obrigado", "pixel", "recuperação de carrinho".
 Na Payt, busque na ajuda: "order bump", "upsell", "one click upsell", "página de obrigado", "pixel do Facebook".
 
-- Bump e upsell são produtos SEPARADOS na plataforma (não entram no produto principal).
+- Bumps e upsell são produtos SEPARADOS na plataforma (não entram no produto principal).
 - A página OTO (Netlify) NÃO tem pixel da Meta: o evento Purchase vem da plataforma.
 - Se o widget de 1 clique da plataforma tiver um link próprio de recusa, deixe o `recusar_url`
   apontando para o mesmo destino e não esconda nada.
