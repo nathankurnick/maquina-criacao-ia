@@ -212,6 +212,28 @@ def test_capa_nao_vai_pro_carrossel(tmp_path):
     assert not any(x.suffix == ".jpg" for x in car.iterdir())
 
 
+def test_jpg_antigo_do_carrossel_e_apagado(tmp_path):
+    pytest.importorskip("playwright")
+    p = _pasta(tmp_path, md="# Um\n\ntexto")
+    car = tmp_path / "car"
+    car.mkdir()
+    (car / "50-guia-do-pao-01.jpg").write_bytes(b"velho")
+    ep.gerar(p, "azul-laranja", carrossel=car)
+    assert sorted(x.name for x in car.iterdir()) == ["50-guia-do-pao-01.png", "50-guia-do-pao-02.png"]
+
+
+def test_capitulo_com_imagem_ganha_de_capitulo_com_tabela(tmp_path):
+    p = _pasta(tmp_path, md="x")
+    _capa_falsa(p, 100, 141)
+    (p / "capa.png").rename(p / "foto.png")
+    md = ("# Tabela\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n# Simples\n\ntexto\n\n"
+          "# Com imagem\n\n![x](foto.png)\n\ntexto")
+    (p / "conteudo.md").write_text(md, encoding="utf-8")
+    r = _gerar_ou_pular(p)
+    assert [c["alvo"] for c in r["clips"]] == ["capitulo", "capitulo"]
+    assert r["clips"][0]["y"] > r["clips"][1]["y"]  # imagem (3º) primeiro, tabela (1º) depois
+
+
 def test_escolher_alvos_nunca_usa_sumario_e_prefere_imagem():
     cand = {"sumario": {"y": 0, "itens": 20}, "main": 0,
             "caps": [{"i": 0, "y": 1000, "pontos": 1}, {"i": 1, "y": 2000, "pontos": 10},
@@ -309,7 +331,7 @@ def test_sumario_longo_nunca_vai_pro_carrossel(tmp_path):
     assert [c["alvo"] for c in r["clips"]] == ["capitulo", "capitulo"]
 
 
-def test_sumario_curto_nao_e_candidato(tmp_path):
+def test_capitulos_ricos_ganham_de_capitulo_simples(tmp_path):
     md = "# A\n\ntexto\n\n# B\n\n" + _rico(2)
     r = _gerar_ou_pular(_pasta(tmp_path, md=md))
     assert [c["alvo"] for c in r["clips"]] == ["capitulo", "capitulo"]
@@ -321,6 +343,7 @@ def test_checklist_so_com_h2_usa_recortes_do_main(tmp_path):
     r = _gerar_ou_pular(p)
     assert [c["alvo"] for c in r["clips"]] == ["main", "main"]
     assert r["clips"][1]["y"] - r["clips"][0]["y"] == 1123
+    assert [_tamanho_png(a)[1] for a in r["amostras"]] == [ep.A4_H, ep.A4_H]
     assert [_tamanho_png(a) for a in r["amostras"]] == [(794, 1123), (794, 1123)]
 
 

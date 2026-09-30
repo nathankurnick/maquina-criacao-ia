@@ -202,7 +202,8 @@ def gerar(pasta: Path, paleta_nome: str, carrossel: "Path | None" = None, ordem:
                     cand = pg.evaluate(_JS_CANDIDATOS % {"alto": A4_H})
                     alvos = escolher_alvos(cand)
                     if alvos[0][0] == "main":  # o <main> vira a "página": sem o padding duplo dos capítulos
-                        pg.add_style_tag(content=("main{padding:18mm 16mm 20mm;min-height:2600px}"
+                        # 2 páginas A4 + folga (>= padding-topo de 18mm ~ 68px) pro 2º recorte nunca passar do fim
+                        pg.add_style_tag(content=(f"main{{padding:18mm 16mm 20mm;min-height:{2 * A4_H + 200}px}}"
                                                   ".capitulo{padding:0;min-height:0}"))
                         alvos = [("main", pg.evaluate("(document.querySelector('.capitulo') || document.querySelector('main'))"
                                                       ".getBoundingClientRect().top + window.scrollY") + k * A4_H)
