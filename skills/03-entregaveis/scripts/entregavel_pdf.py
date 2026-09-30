@@ -113,9 +113,10 @@ _JS_CANDIDATOS = """() => {
   const topo = el => el.getBoundingClientRect().top + window.scrollY;
   const caps = [...document.querySelectorAll('.capitulo')].map((el, i) => {
     const t0 = topo(el);
-    const visuais = [...el.querySelectorAll('.caixa, table, .checklist, figure')]
-      .filter(v => topo(v) - t0 < %(alto)d).length;
-    return {i, y: t0, pontos: visuais};
+    const dentro = v => topo(v) - t0 < %(alto)d;
+    const imagens = [...el.querySelectorAll('img')].filter(dentro).length;
+    const outros = [...el.querySelectorAll('.caixa, table, .checklist')].filter(dentro).length;
+    return {i, y: t0, pontos: imagens * 10 + outros};
   });
   const s = document.querySelector('.sumario');
   const m = document.querySelector('main');
@@ -125,13 +126,10 @@ _JS_CANDIDATOS = """() => {
 
 
 def escolher_alvos(cand: dict) -> list:
-    """Devolve [(alvo, y)] das 2 páginas mais visuais; cai em recortes do <main> se faltar candidato."""
+    """Devolve [(alvo, y)] das 2 páginas mais visuais (imagem > tabela/caixa/checklist). Nunca o
+    sumário: ele não vende. Com menos de 2 capítulos, recorta o <main> a partir do 1º capítulo."""
     caps = sorted(cand["caps"], key=lambda c: (-c["pontos"], c["i"]))
-    alvos = []
-    if cand["sumario"] and cand["sumario"]["itens"] >= 8:
-        alvos.append(("sumario", cand["sumario"]["y"]))
-    alvos += [("capitulo", c["y"]) for c in caps]
-    alvos = alvos[:2]
+    alvos = [("capitulo", c["y"]) for c in caps][:2]
     if len(alvos) < 2:
         return [("main", cand["main"]), ("main", cand["main"] + A4_H)]
     return alvos
@@ -140,19 +138,6 @@ def escolher_alvos(cand: dict) -> list:
 def _capa_antiga(pasta: Path) -> bool:
     capa, meta = pasta / "capa.png", pasta / "meta.json"
     return capa.exists() and meta.exists() and meta.stat().st_mtime > capa.stat().st_mtime
-
-
-def _capa_jpeg(pg, capa: Path, destino: Path) -> None:
-    """Capa reduzida (800px de largura, JPEG qualidade 82) renderizada pelo próprio Chromium."""
-    tmp = capa.parent / ".capa-jpeg.html"
-    tmp.write_text('<!doctype html><body style="margin:0"><img id="i" style="display:block;width:800px" '
-                   f'src="{e(capa.name)}"></body>', encoding="utf-8")
-    try:
-        pg.set_viewport_size({"width": 800, "height": 1200})
-        pg.goto(tmp.as_uri(), wait_until="load")
-        pg.query_selector("#i").screenshot(path=str(destino), type="jpeg", quality=82)
-    finally:
-        tmp.unlink(missing_ok=True)
 
 
 def gerar(pasta: Path, paleta_nome: str, carrossel: "Path | None" = None, ordem: int = 50) -> dict:
@@ -186,7 +171,6 @@ def gerar(pasta: Path, paleta_nome: str, carrossel: "Path | None" = None, ordem:
     amostras: list[Path] = []
     novas: list[Path] = []
     clips: list[dict] = []
-    capa_jpg = pasta / ".capa-carrossel.jpg"
     try:
         with sync_playwright() as p:
             nav = p.chromium.launch()
@@ -218,18 +202,17 @@ def gerar(pasta: Path, paleta_nome: str, carrossel: "Path | None" = None, ordem:
                     cand = pg.evaluate(_JS_CANDIDATOS % {"alto": A4_H})
                     alvos = escolher_alvos(cand)
                     if alvos[0][0] == "main":  # o <main> vira a "página": sem o padding duplo dos capítulos
-                        pg.add_style_tag(content=("main{padding:18mm 16mm 20mm;min-height:2246px}"
+                        pg.add_style_tag(content=("main{padding:18mm 16mm 20mm;min-height:2600px}"
                                                   ".capitulo{padding:0;min-height:0}"))
-                        alvos = [("main", pg.evaluate("document.querySelector('main').getBoundingClientRect().top"
-                                                      " + window.scrollY") + k * A4_H) for k in (0, 1)]
+                        alvos = [("main", pg.evaluate("(document.querySelector('.capitulo') || document.querySelector('main'))"
+                                                      ".getBoundingClientRect().top + window.scrollY") + k * A4_H)
+                                 for k in (0, 1)]
                 for k, (alvo, y) in enumerate(alvos, 1):
                     destino = previa / f".amostra-{k}.png"
                     novas.append(destino)
                     pg.screenshot(path=str(destino), full_page=True,
                                   clip={"x": 0, "y": y, "width": largura, "height": alto})
                     clips.append({"alvo": alvo, "y": y})
-                if carrossel is not None and capa:
-                    _capa_jpeg(pg, pasta / "capa.png", capa_jpg)
             finally:
                 try:
                     nav.close()
@@ -246,7 +229,6 @@ def gerar(pasta: Path, paleta_nome: str, carrossel: "Path | None" = None, ordem:
         pdf_tmp.unlink(missing_ok=True)
         for tmp in novas:
             tmp.unlink(missing_ok=True)
-        capa_jpg.unlink(missing_ok=True)
         raise
     else:
         pdf_tmp.replace(pdf)
@@ -254,22 +236,19 @@ def gerar(pasta: Path, paleta_nome: str, carrossel: "Path | None" = None, ordem:
         render.unlink(missing_ok=True)
 
     copiados: list[Path] = []
-    try:
-        if carrossel is not None:
-            carrossel = Path(carrossel)
-            carrossel.mkdir(parents=True, exist_ok=True)
-            padrao = re.compile(rf"(\d{{2}}-)?{re.escape(pasta.name)}-\d{{2}}\.(png|jpg)")
-            for velho in carrossel.iterdir():
-                if padrao.fullmatch(velho.name):
-                    velho.unlink()
-            prefixo = f"{ordem:02d}-{pasta.name}"
-            origens = ([capa_jpg] if capa else []) + amostras
-            for n, origem in enumerate(origens, 1):
-                destino = carrossel / f"{prefixo}-{n:02d}{origem.suffix if origem != capa_jpg else '.jpg'}"
-                shutil.copyfile(origem, destino)
-                copiados.append(destino)
-    finally:
-        capa_jpg.unlink(missing_ok=True)
+    if carrossel is not None:
+        carrossel = Path(carrossel)
+        carrossel.mkdir(parents=True, exist_ok=True)
+        padrao = re.compile(rf"(\d{{2}}-)?{re.escape(pasta.name)}-\d{{2}}\.(png|jpg)")
+        for velho in carrossel.iterdir():
+            if padrao.fullmatch(velho.name):
+                velho.unlink()
+        prefixo = f"{ordem:02d}-{pasta.name}"
+        origens = list(amostras)
+        for n, origem in enumerate(origens, 1):
+            destino = carrossel / f"{prefixo}-{n:02d}{origem.suffix}"
+            shutil.copyfile(origem, destino)
+            copiados.append(destino)
     return {"pdf": pdf, "amostras": amostras, "carrossel": copiados, "clips": clips, "avisos": avisos}
 
 

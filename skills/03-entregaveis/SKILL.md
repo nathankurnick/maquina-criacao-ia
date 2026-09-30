@@ -110,11 +110,12 @@ PY="$HOME/.maquina/venv/bin/python"; S="$HOME/.claude/skills/03-entregaveis/scri
 ```
 
 - Saídas: `<E>/<slug>.pdf` e `<E>/previa/amostra-1.png` e `amostra-2.png`: as 2 páginas de
-  conteúdo mais visuais (com mais caixas, tabelas, checklists ou imagens; o sumário entra só
-  se tiver 8 itens ou mais). Documento sem capítulos (`#`) usa as duas primeiras páginas do
+  conteúdo mais visuais (imagens primeiro, depois caixas, tabelas e checklists; o sumário nunca entra). Documento sem capítulos (`#`) usa as duas primeiras páginas do
   texto. Nos slides, as amostras são os slides 2 e 3.
-- `--carrossel` copia pro carrossel da página de vendas as imagens `NN-<slug>-01.jpg` (a capa
-  reduzida, se existir), `NN-<slug>-02.png`…, onde `NN` é o `--ordem` (1 a 99, padrão 50): o
+- `--carrossel` copia pro carrossel da página de vendas as 2 páginas mais visuais do material
+  (`NN-<slug>-01.png`, `-02.png`): capítulos com imagem primeiro, depois tabelas e checklists;
+  o sumário nunca entra. A capa não vai pro carrossel: ela vira o mockup do topo e dos bônus
+  (Sistema 02). `NN` é o `--ordem` (1 a 99, padrão 50): o
   carrossel segue essa ordem. Use `--ordem 1` no produto principal, `--ordem 2` no primeiro
   bônus, `--ordem 3` no seguinte, e assim por diante. Só os arquivos deste entregável são
   substituídos; os outros do carrossel ficam. Omita `--carrossel` se o aluno não quiser. Slides: não use `--carrossel`.

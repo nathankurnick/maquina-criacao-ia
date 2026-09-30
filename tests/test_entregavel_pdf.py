@@ -20,17 +20,6 @@ def _capa_falsa(p, w=1240, h=1754):
                                  + chunk(b"IDAT", zlib.compress(linha * h)) + chunk(b"IEND", b""))
 
 
-def _tamanho_jpeg(d):
-    i = 2
-    while i < len(d):
-        marc = d[i + 1]
-        n = int.from_bytes(d[i + 2:i + 4], "big")
-        if marc in (0xC0, 0xC1, 0xC2):
-            return int.from_bytes(d[i + 7:i + 9], "big"), int.from_bytes(d[i + 5:i + 7], "big")
-        i += 2 + n
-    raise AssertionError("sem SOF")
-
-
 def _pasta(tmp_path, tipo="ebook", md=None, meta=None):
     p = tmp_path / "proj" / "entregaveis" / "guia-do-pao"
     p.mkdir(parents=True)
@@ -213,17 +202,32 @@ def test_ordem_define_o_prefixo_e_a_ordenacao(tmp_path):
     assert ep.main(["--pasta", str(a), "--ordem", "x"]) == 1
 
 
-def test_capa_no_carrossel_e_jpeg_de_800px(tmp_path):
+def test_capa_nao_vai_pro_carrossel(tmp_path):
     pytest.importorskip("playwright")
     p = _pasta(tmp_path, md="# Um\n\ntexto")
     _capa_falsa(p)
     car = tmp_path / "car"
     r = ep.gerar(p, "azul-laranja", carrossel=car)
-    nomes = sorted(x.name for x in car.iterdir())
-    assert nomes == ["50-guia-do-pao-01.jpg", "50-guia-do-pao-02.png", "50-guia-do-pao-03.png"]
-    d = (car / "50-guia-do-pao-01.jpg").read_bytes()
-    assert d[:3] == b"\xff\xd8\xff"
-    assert _tamanho_jpeg(d)[0] == 800 and len(r["carrossel"]) == 3
+    assert len(r["carrossel"]) == 2
+    assert not any(x.suffix == ".jpg" for x in car.iterdir())
+
+
+def test_escolher_alvos_nunca_usa_sumario_e_prefere_imagem():
+    cand = {"sumario": {"y": 0, "itens": 20}, "main": 0,
+            "caps": [{"i": 0, "y": 1000, "pontos": 1}, {"i": 1, "y": 2000, "pontos": 10},
+                     {"i": 2, "y": 3000, "pontos": 0}]}
+    assert ep.escolher_alvos(cand) == [("capitulo", 2000), ("capitulo", 1000)]
+
+
+def test_escolher_alvos_sem_visual_pega_os_primeiros_capitulos():
+    cand = {"sumario": {"y": 0, "itens": 20}, "main": 0,
+            "caps": [{"i": 0, "y": 1000, "pontos": 0}, {"i": 1, "y": 2000, "pontos": 0}]}
+    assert ep.escolher_alvos(cand) == [("capitulo", 1000), ("capitulo", 2000)]
+
+
+def test_escolher_alvos_um_capitulo_cai_no_main():
+    cand = {"sumario": None, "main": 50, "caps": [{"i": 0, "y": 100, "pontos": 3}]}
+    assert [a for a, _ in ep.escolher_alvos(cand)] == ["main", "main"]
 
 
 def test_pdf_antigo_sobrevive_se_a_geracao_falha(tmp_path, monkeypatch):
@@ -299,10 +303,10 @@ def test_empate_de_pontuacao_segue_a_ordem_do_documento(tmp_path):
     assert r["clips"][0]["y"] < r["clips"][1]["y"]
 
 
-def test_sumario_longo_vai_primeiro(tmp_path):
+def test_sumario_longo_nunca_vai_pro_carrossel(tmp_path):
     md = "\n\n".join(f"# Capítulo {i}\n\ntexto {i}" for i in range(1, 9))
     r = _gerar_ou_pular(_pasta(tmp_path, md=md))
-    assert [c["alvo"] for c in r["clips"]] == ["sumario", "capitulo"]
+    assert [c["alvo"] for c in r["clips"]] == ["capitulo", "capitulo"]
 
 
 def test_sumario_curto_nao_e_candidato(tmp_path):
