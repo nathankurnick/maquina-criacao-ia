@@ -323,3 +323,89 @@ def test_disclaimer_hifen_rodape_so_com_copyright():
     assert "Todos os direitos reservados" in h and 'class="disclaimer"' not in h
     c2, _ = pc.normalizar(_conteudo())
     assert 'class="disclaimer"' in _html(conteudo=c2)
+
+
+def _imgs(**extra):
+    base = {"logo": "", "carrossel": [], "depoimentos": []}
+    base.update(extra)
+    return base
+
+
+def test_hero_com_mockup_em_grade():
+    h = _html(imagens=_imgs(topo="img/mockup-topo.png", tamanhos={"img/mockup-topo.png": (1200, 1200)}))
+    assert 'class="caixa hero-grade"' in h
+    assert '<img class="hero-mockup" src="img/mockup-topo.png"' in h and 'width="1200" height="1200"' in h
+    assert 'fetchpriority="high"' in h and 'class="hero-cta' in h
+    i_h1, i_img, i_cta = h.index("<h1>"), h.index('<img class="hero-mockup"'), h.index('class="hero-cta')
+    assert i_h1 < i_img < i_cta  # no celular: headline, mockup, botão
+
+
+def test_hero_sem_mockup_continua_igual():
+    h = _html()
+    assert 'class="caixa hero-grade"' not in h and 'class="caixa caixa-estreita centro"' in h
+
+
+def test_bonus_com_mockup():
+    h = _html(imagens=_imgs(bonus={1: "img/mockup-bonus-1.png"}))
+    assert '<img class="bonus-mockup" src="img/mockup-bonus-1.png" alt="Bônus #1: Checklist" loading="lazy"' in h
+
+
+def test_carrossel_de_mockups_tem_classe_propria():
+    c = _conteudo()
+    h = _html(conteudo=c, imagens=_imgs(carrossel=["img/carrossel-01.png"], carrossel_mockup=True))
+    assert 'class="carrossel carrossel-mockup"' in h and 'loading="lazy"' in h
+
+
+def test_um_plano_so_fica_centralizado():
+    assert 'class="grade grade-1"' in _html()
+    c = _conteudo(planos={"titulo": "P", "basico": {"itens": ["a"], "precoPor": "R$ 1", "checkoutUrl": "https://pay.x.com/a"},
+                          "premium": {"ativo": True, "itens": ["b"], "precoPor": "R$ 2", "checkoutUrl": "https://pay.x.com/b"}})
+    assert 'class="grade grade-2"' in _html(conteudo=c)
+
+
+def test_montar_site_usa_mockups(tmp_path):
+    p = tmp_path / "proj"
+    pag = p / "pagina"
+    (pag / "imagens" / "carrossel").mkdir(parents=True)
+    (pag / "imagens" / "mockups").mkdir()
+    (pag / "conteudo.json").write_text(json.dumps({
+        "hero": {"headline": "H"}, "bonus": {"itens": [{"titulo": "A"}, {"titulo": "B"}]},
+        "planos": {"basico": {"itens": ["x"], "precoPor": "R$ 9", "checkoutUrl": "https://pay.x.com/a"}}}),
+        encoding="utf-8")
+    import struct
+    import zlib
+
+    def png(w, h):
+        def chunk(t, d):
+            return struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d))
+        return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 6, 0, 0, 0))
+                + chunk(b"IDAT", zlib.compress((b"\x00" + b"\x00" * 4 * w) * h)) + chunk(b"IEND", b""))
+
+    (pag / "imagens" / "carrossel" / "01-a.png").write_bytes(png(4, 5))
+    (pag / "imagens" / "mockups" / "topo.png").write_bytes(png(12, 12))
+    (pag / "imagens" / "mockups" / "bonus-2.png").write_bytes(png(10, 10))
+    (pag / "imagens" / "mockups" / "pagina-01.png").write_bytes(png(9, 12))
+    index, avisos = pr.montar_site(p)
+    h = index.read_text(encoding="utf-8")
+    site = index.parent
+    assert (site / "img" / "mockup-topo.png").exists() and 'width="12" height="12"' in h
+    assert (site / "img" / "mockup-bonus-2.png").exists() and "mockup-bonus-1" not in h
+    assert (site / "img" / "carrossel-01.png").read_bytes() == (pag / "imagens" / "mockups" / "pagina-01.png").read_bytes()
+    assert "carrossel-mockup" in h
+
+
+def test_aviso_quando_carrossel_mudou_depois_dos_mockups(tmp_path):
+    import os
+    import time
+    p = tmp_path / "proj"
+    pag = p / "pagina"
+    (pag / "imagens" / "carrossel").mkdir(parents=True)
+    (pag / "imagens" / "mockups").mkdir()
+    (pag / "conteudo.json").write_text(json.dumps({"hero": {"headline": "H"}}), encoding="utf-8")
+    m = pag / "imagens" / "mockups" / "pagina-01.png"
+    m.write_bytes(b"\x89PNG\r\n\x1a\n")
+    velho = time.time() - 100
+    os.utime(m, (velho, velho))
+    (pag / "imagens" / "carrossel" / "01-a.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+    _, avisos = pr.montar_site(p)
+    assert any("pagina_mockups.py" in a for a in avisos)

@@ -69,6 +69,14 @@ a.cta:focus-visible,summary:focus-visible{outline:3px solid var(--pg-destaque);o
 .rodape{padding:40px 16px;text-align:center}
 .rodape p{font-size:14px;opacity:.8}
 .rodape .disclaimer{margin-top:16px;font-size:12px;opacity:.6}
+.hero-grade{display:grid;gap:28px;grid-template-areas:"texto" "mockup" "cta";align-items:center;text-align:center}
+.hero-texto{grid-area:texto}
+.hero-mockup{grid-area:mockup;width:100%;max-width:420px;height:auto;margin:0 auto;filter:drop-shadow(0 24px 40px rgba(0,0,0,.35))}
+.hero-cta{grid-area:cta}
+.hero-cta .cta{margin-top:0}
+.bonus-mockup{width:100%;max-width:240px;height:auto;margin:0 auto 16px;filter:drop-shadow(0 12px 20px rgba(0,0,0,.35))}
+.carrossel.carrossel-mockup img{border:0;background:transparent;box-shadow:none;border-radius:0}
+.grade-1{max-width:440px;margin-left:auto;margin-right:auto}
 @media (min-width:640px){
   .secao{padding:80px 16px}
   .hero{padding-top:64px}
@@ -82,4 +90,9 @@ a.cta:focus-visible,summary:focus-visible{outline:3px solid var(--pg-destaque);o
 }
 @media (min-width:1024px){
   .grade-3l{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media (min-width:900px){
+  .hero-grade{grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);grid-template-areas:"texto mockup" "cta mockup";text-align:left;column-gap:48px}
+  .hero-grade .logo{margin-left:0}
+  .hero-mockup{max-width:520px}
 }

@@ -10,6 +10,7 @@ import json
 import os
 import re
 import shutil
+import struct
 import sys
 import traceback
 from datetime import date, datetime
@@ -78,7 +79,23 @@ def _cabeca(b: dict) -> str:
     return s
 
 
-def _hero(b, logo, href, nome=""):
+def _dimensoes_png(arq: Path) -> "tuple[int, int] | None":
+    try:
+        with open(arq, "rb") as f:
+            cab = f.read(24)
+    except OSError:
+        return None
+    if not cab.startswith(b"\x89PNG\r\n\x1a\n") or len(cab) < 24:
+        return None
+    return struct.unpack(">II", cab[16:24])
+
+
+def _tam(src: str, tamanhos: dict) -> str:
+    wh = tamanhos.get(src)
+    return f' width="{wh[0]}" height="{wh[1]}"' if wh else ""
+
+
+def _hero(b, logo, href, nome="", mockup="", tamanhos=None):
     if not b["ativo"]:
         return ""
     partes = []
@@ -89,17 +106,24 @@ def _hero(b, logo, href, nome=""):
     partes.append(f"<h1>{com_destaque(b['headline'])}</h1>")
     if b["subheadline"]:
         partes.append(f'<p class="subheadline">{e(b["subheadline"])}</p>')
-    partes.append(_cta(href, b["cta"]))
-    return _secao("escura hero", f'<div class="caixa caixa-estreita centro">{"".join(partes)}</div>')
+    if not mockup:
+        partes.append(_cta(href, b["cta"]))
+        return _secao("escura hero", f'<div class="caixa caixa-estreita centro">{"".join(partes)}</div>')
+    img = (f'<img class="hero-mockup" src="{e(mockup)}" alt="{e(nome or "Produto")}"'
+           f'{_tam(mockup, tamanhos or {})} fetchpriority="high">')
+    return _secao("escura hero", f'<div class="caixa hero-grade"><div class="hero-texto">{"".join(partes)}</div>'
+                                 f'{img}<div class="hero-cta">{_cta(href, b["cta"])}</div></div>')
 
 
-def _carrossel(b, imagens):
+def _carrossel(b, imagens, mockup=False, tamanhos=None):
     if not b["ativo"] or not imagens:
         return ""
-    fotos = "".join(f'<img src="{e(src)}" alt="Imagem {i} do material">' for i, src in enumerate(imagens, 1))
+    fotos = "".join(f'<img src="{e(src)}" alt="Imagem {i} do material"{_tam(src, tamanhos or {})} loading="lazy">'
+                    for i, src in enumerate(imagens, 1))
     desc = f'<p class="sub">{e(b["descricao"])}</p>' if b["descricao"] else ""
+    classe = "carrossel carrossel-mockup" if mockup else "carrossel"
     return _secao("clara borda-topo",
-                  f'<div class="caixa"><h2>{e(b["titulo"])}</h2>{desc}<div class="carrossel">{fotos}</div></div>')
+                  f'<div class="caixa"><h2>{e(b["titulo"])}</h2>{desc}<div class="{classe}">{fotos}</div></div>')
 
 
 def _para_quem(b, href):
@@ -137,13 +161,16 @@ def _entrega(b):
     return _secao("branca", f'<div class="caixa caixa-media">{_cabeca(b)}<div class="grade grade-3">{cartoes}</div></div>')
 
 
-def _bonus(b):
+def _bonus(b, mockups=None, tamanhos=None):
     if not b["ativo"]:
         return ""
     cartoes = []
     for n, i in enumerate(b["itens"], 1):
+        src = (mockups or {}).get(n, "")
+        img = (f'<img class="bonus-mockup" src="{e(src)}" alt="Bônus #{n}: {e(i["titulo"])}" loading="lazy"'
+               f'{_tam(src, tamanhos or {})}>' if src else "")
         valor = (f'<p class="valor"><s>{e(i["valor"])}</s> <strong>GRÁTIS</strong></p>' if i["valor"] else "")
-        cartoes.append(f'<div class="cartao cartao-vidro"><p class="rotulo">Bônus #{n}</p><h3>{e(i["titulo"])}</h3>'
+        cartoes.append(f'<div class="cartao cartao-vidro">{img}<p class="rotulo">Bônus #{n}</p><h3>{e(i["titulo"])}</h3>'
                        f'<p class="desc">{e(i["descricao"])}</p>{valor}</div>')
     return _secao("escura", f'<div class="caixa">{_cabeca(b)}<div class="grade grade-2 grade-3l">{"".join(cartoes)}</div></div>')
 
@@ -171,8 +198,10 @@ def _planos(b):
     if not b["ativo"]:
         return ""
     cartoes = _cartao_plano(b["basico"]) + _cartao_plano(b["premium"])
+    ativos = sum(1 for p in (b["basico"], b["premium"]) if p["ativo"])
+    grade = "grade grade-2" if ativos > 1 else "grade grade-1"
     return _secao("clara borda-topo planos", f'<div class="caixa caixa-media">{_cabeca(b)}'
-                                             f'<div class="grade grade-2">{cartoes}</div></div>', id_="planos")
+                                             f'<div class="{grade}">{cartoes}</div></div>', id_="planos")
 
 
 def _garantia(b, href):
@@ -227,14 +256,17 @@ def render_html(conteudo: dict, config: dict, imagens: dict, ano: int) -> str:
     titulo = (config.get("seo_titulo") or hero["headline"].replace("**", "")
               or conteudo["rodape"]["nomeProduto"] or "Página de vendas")
     descricao = config.get("seo_descricao") or hero["subheadline"]
+    tamanhos = imagens.get("tamanhos", {})
     corpo = "".join([
-        _hero(hero, imagens.get("logo", ""), href, conteudo["rodape"]["nomeProduto"]),
-        _carrossel(conteudo["carrossel"], imagens.get("carrossel", [])),
+        _hero(hero, imagens.get("logo", ""), href, conteudo["rodape"]["nomeProduto"],
+              imagens.get("topo", ""), tamanhos),
+        _carrossel(conteudo["carrossel"], imagens.get("carrossel", []), imagens.get("carrossel_mockup", False),
+                   tamanhos),
         _para_quem(conteudo["paraQuem"], href),
         _conteudo(conteudo["conteudo"]),
         _incluso(conteudo["incluso"]),
         _entrega(conteudo["entrega"]),
-        _bonus(conteudo["bonus"]),
+        _bonus(conteudo["bonus"], imagens.get("bonus", {}), tamanhos),
         _depoimentos(conteudo["depoimentos"], imagens.get("depoimentos", [])),
         _planos(planos),
         _garantia(conteudo["garantia"], href),
@@ -295,7 +327,8 @@ def _relativa(pasta_projeto, pagina) -> str:
 
 def _montar(pagina, conteudo, config, avisos, site, novo, rel="pagina"):
 
-    imagens = {"logo": "", "carrossel": [], "depoimentos": []}
+    imagens = {"logo": "", "carrossel": [], "depoimentos": [], "topo": "", "bonus": {}, "tamanhos": {},
+               "carrossel_mockup": False}
     logos = [p for p in sorted((pagina / "imagens").iterdir())
              if p.is_file() and p.stem.lower() == "logo" and p.suffix.lower() in EXT_LOGO] \
         if (pagina / "imagens").is_dir() else []
@@ -303,11 +336,36 @@ def _montar(pagina, conteudo, config, avisos, site, novo, rel="pagina"):
         destino = novo / "img" / f"logo{logos[0].suffix.lower()}"
         shutil.copyfile(logos[0], destino)
         imagens["logo"] = f"img/{destino.name}"
-    for tipo, prefixo in (("carrossel", "carrossel"), ("depoimentos", "depoimento")):
-        for n, foto in enumerate(fotos_da_pasta(pagina / "imagens" / tipo), 1):
-            destino = novo / "img" / f"{prefixo}-{n:02d}{foto.suffix.lower()}"
-            shutil.copyfile(foto, destino)
-            imagens[tipo].append(f"img/{destino.name}")
+    mockups = pagina / "imagens" / "mockups"
+
+    def copiar(origem: Path, nome: str) -> str:
+        destino = novo / "img" / nome
+        shutil.copyfile(origem, destino)
+        src = f"img/{nome}"
+        wh = _dimensoes_png(origem)
+        if wh:
+            imagens["tamanhos"][src] = wh
+        return src
+
+    if conteudo["hero"]["ativo"] and (mockups / "topo.png").is_file():
+        imagens["topo"] = copiar(mockups / "topo.png", "mockup-topo.png")
+    for n in range(1, len(conteudo["bonus"]["itens"]) + 1):
+        if (mockups / f"bonus-{n}.png").is_file():
+            imagens["bonus"][n] = copiar(mockups / f"bonus-{n}.png", f"mockup-bonus-{n}.png")
+    brutas = fotos_da_pasta(pagina / "imagens" / "carrossel")
+    paginas = sorted(mockups.glob("pagina-[0-9][0-9].png")) if mockups.is_dir() else []
+    if paginas:
+        imagens["carrossel_mockup"] = True
+        for n, foto in enumerate(paginas, 1):
+            imagens["carrossel"].append(copiar(foto, f"carrossel-{n:02d}.png"))
+        if brutas and max(f.stat().st_mtime for f in brutas) > min(f.stat().st_mtime for f in paginas):
+            avisos.append(f"carrossel: as imagens de {rel}/imagens/carrossel/ mudaram depois dos mockups — "
+                          "rode o pagina_mockups.py de novo pra atualizar.")
+    else:
+        for n, foto in enumerate(brutas, 1):
+            imagens["carrossel"].append(copiar(foto, f"carrossel-{n:02d}{foto.suffix.lower()}"))
+    for n, foto in enumerate(fotos_da_pasta(pagina / "imagens" / "depoimentos"), 1):
+        imagens["depoimentos"].append(copiar(foto, f"depoimento-{n:02d}{foto.suffix.lower()}"))
     if not imagens["depoimentos"]:
         avisos.append(f"depoimentos: sem prints em {rel}/imagens/depoimentos/ — a seção fica escondida "
                       "(coloque só depoimentos reais).")
