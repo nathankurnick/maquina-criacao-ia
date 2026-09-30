@@ -1,9 +1,6 @@
 import json
 
-import pytest
-
 import pagina_mockups as pm
-from nucleo import mockup
 
 
 def _projeto(tmp_path, bonus=2, fotos=3, hero_entregavel="pack", capa_principal=True):
@@ -109,3 +106,86 @@ def test_main_sem_kie_e_erros(tmp_path, ambiente, monkeypatch, capsys):
     assert pm.main(["--projeto", str(tmp_path / "nada")]) == 1
     assert "conteudo.json" in capsys.readouterr().err
     assert pm.main([]) == 1
+
+
+def _fakes(monkeypatch, chamadas, perm_pack=False):
+    def falso(tipo, entradas, destino, paleta_nome, chave=None, refazer=False):
+        chamadas.append((tipo, destino.name, chave, [p.name for p in entradas]))
+        destino.write_bytes(b"m")
+        perm = perm_pack and chave is not None and tipo == "pack"
+        return {"arquivo": destino, "modo": "codigo" if perm or not chave else "kie",
+                "aviso": "Seus créditos da KIE acabaram." if perm else "", "permanente": perm}
+    monkeypatch.setattr(pm, "gerar_mockup", falso)
+    monkeypatch.setattr(pm, "gerar_capa_simples", lambda titulo, rotulo, destino, paleta_nome:
+                        destino.parent.mkdir(parents=True, exist_ok=True) or (destino.write_bytes(b"c") and destino))
+
+
+def test_paginas_nunca_usam_kie(tmp_path, monkeypatch):
+    chamadas = []
+    _fakes(monkeypatch, chamadas)
+    pm.gerar(pm.planejar(_projeto(tmp_path, bonus=1, fotos=2)), "azul-laranja", "k")
+    assert [c[2] for c in chamadas if c[0] == "pagina"] == [None, None]
+    assert all(c[2] == "k" for c in chamadas if c[0] != "pagina")
+
+
+def test_aviso_conta_todas_as_capas_em_codigo(tmp_path, monkeypatch):
+    _fakes(monkeypatch, [], perm_pack=True)
+    r = pm.gerar(pm.planejar(_projeto(tmp_path, bonus=2, fotos=1)), "azul-laranja", "k")
+    aviso = [a for a in r["avisos"] if "modo código" in a]
+    assert len(aviso) == 1 and aviso[0].startswith("⚠️ 3 mockup(s)") and "créditos" in aviso[0]
+
+
+def test_hero_inativo(tmp_path, monkeypatch):
+    chamadas = []
+    _fakes(monkeypatch, chamadas)
+    p = _projeto(tmp_path, bonus=1, fotos=0, capa_principal=False)
+    c = json.loads((p / "pagina" / "conteudo.json").read_text(encoding="utf-8"))
+    c["hero"]["ativo"] = False
+    (p / "pagina" / "conteudo.json").write_text(json.dumps(c), encoding="utf-8")
+    saida = p / "pagina" / "imagens" / "mockups"
+    saida.mkdir(parents=True)
+    (saida / "topo.png").write_bytes(b"velho")
+    plano = pm.planejar(p)
+    assert plano["avisos"] == [] and plano["kie"] == 1
+    pm.gerar(plano, "azul-laranja", None)
+    assert not (saida / "topo.png").exists() and [c[0] for c in chamadas] == ["livro"]
+
+
+def test_sem_bonus_pack_so_com_principal(tmp_path, monkeypatch):
+    chamadas = []
+    _fakes(monkeypatch, chamadas)
+    p = _projeto(tmp_path, bonus=1, fotos=0)
+    c = json.loads((p / "pagina" / "conteudo.json").read_text(encoding="utf-8"))
+    c["bonus"]["ativo"] = False
+    (p / "pagina" / "conteudo.json").write_text(json.dumps(c), encoding="utf-8")
+    pm.gerar(pm.planejar(p), "azul-laranja", None)
+    assert [(c[0], len(c[3])) for c in chamadas] == [("pack", 1)]
+    assert not list((p / "pagina" / "imagens" / "mockups").glob("bonus-*.png"))
+
+
+def test_limpa_capas_antigas(tmp_path, monkeypatch):
+    _fakes(monkeypatch, [])
+    p = _projeto(tmp_path, bonus=1, fotos=0)
+    capas = p / "pagina" / "imagens" / "mockups" / ".capas"
+    capas.mkdir(parents=True)
+    (capas / "bonus-3-abc.png").write_bytes(b"v")
+    (capas / "principal-abc.png").write_bytes(b"v")
+    pm.gerar(pm.planejar(p), "azul-laranja", None)
+    assert list(capas.glob("*.png")) == []
+
+
+def test_estimar_nao_aborta_se_saldo_falha(tmp_path, ambiente, monkeypatch, capsys):
+    monkeypatch.setattr(pm, "obter_chave", lambda nome: "k")
+    def quebra(chave):
+        raise OSError("rede")
+    monkeypatch.setattr(pm.kie, "creditos", quebra)
+    assert pm.main(["--projeto", str(_projeto(tmp_path)), "--estimar"]) == 0
+    assert "Não consegui ver o saldo" in capsys.readouterr().out
+
+
+def test_execucao_real_mostra_estimativa_antes(tmp_path, ambiente, monkeypatch, capsys):
+    monkeypatch.setattr(pm, "obter_chave", lambda nome: "k")
+    monkeypatch.setattr(pm.kie, "creditos", lambda chave: 5.0)
+    monkeypatch.setattr(pm, "gerar", lambda plano, paleta_nome, chave, refazer=False: {"modos": [], "avisos": []})
+    assert pm.main(["--projeto", str(_projeto(tmp_path))]) == 0
+    assert "gerações" in capsys.readouterr().out

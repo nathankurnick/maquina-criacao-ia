@@ -64,7 +64,7 @@ def planejar(projeto: Path) -> dict:
     avisos = []
     hero = conteudo["hero"]
     principal = _capa(projeto, hero["entregavel"])
-    if hero["entregavel"] and principal is None:
+    if hero["ativo"] and hero["entregavel"] and principal is None:
         avisos.append(f"topo: não achei entregaveis/{hero['entregavel']}/capa.png — usei uma capa simples "
                       "com o nome do produto (gere a capa no Sistema 03 pra ficar melhor).")
     nome = conteudo["rodape"]["nomeProduto"] or hero["headline"].replace("**", "")
@@ -111,10 +111,15 @@ def gerar(plano: dict, paleta_nome: str, chave: "str | None", refazer: bool = Fa
     capas = saida / ".capas"
     estado = {"chave": chave}
     modos, falhas = [], []
+    contagem = {"codigo": 0}
 
     def um(tipo, entradas, destino):
-        r = gerar_mockup(tipo, entradas, destino, paleta_nome, estado["chave"], refazer)
+        # páginas do carrossel nunca usam a KIE (fiéis ao material, e grátis)
+        usa_chave = estado["chave"] if tipo != "pagina" else None
+        r = gerar_mockup(tipo, entradas, destino, paleta_nome, usa_chave, refazer)
         modos.append((destino.name, r["modo"]))
+        if tipo != "pagina" and chave is not None and r["modo"] == "codigo":
+            contagem["codigo"] += 1
         if r["aviso"]:
             falhas.append(r["aviso"])
         if r["permanente"]:
@@ -122,8 +127,9 @@ def gerar(plano: dict, paleta_nome: str, chave: "str | None", refazer: bool = Fa
 
     capas_bonus = [b["capa"] or _capa_simples(capas, f"bonus-{b['n']}", b["titulo"], f"Bônus #{b['n']}", paleta_nome)
                    for b in plano["bonus"]]
+    principal_usada = None
     if plano["topo"]["ativo"]:
-        principal = plano["topo"]["capa"] or _capa_simples(capas, "principal", plano["topo"]["nome"], "Produto",
+        principal = principal_usada = plano["topo"]["capa"] or _capa_simples(capas, "principal", plano["topo"]["nome"], "Produto",
                                                            paleta_nome)
         um("pack", [principal] + capas_bonus[:MAX_BONUS_PACK], plano["topo"]["destino"])
     for b, capa in zip(plano["bonus"], capas_bonus):
@@ -131,9 +137,14 @@ def gerar(plano: dict, paleta_nome: str, chave: "str | None", refazer: bool = Fa
     for k, foto in enumerate(plano["paginas"], 1):
         um("pagina", [foto], saida / f"pagina-{k:02d}.png")
     _limpar_sobras(saida, len(plano["bonus"]), len(plano["paginas"]), plano["topo"]["ativo"])
+    if capas.is_dir():
+        em_uso = {c.resolve() for c in capas_bonus + [principal_usada] if c is not None}
+        for velha in capas.glob("*.png"):
+            if velha.resolve() not in em_uso:
+                velha.unlink()
     avisos = list(plano["avisos"])
-    if falhas:
-        avisos.append(f"⚠️ {len(falhas)} mockup(s) saíram no modo código porque a KIE falhou: {falhas[0]}")
+    if contagem["codigo"] and falhas:
+        avisos.append(f"⚠️ {contagem['codigo']} mockup(s) saíram no modo código porque a KIE falhou: {falhas[0]}")
     return {"modos": modos, "avisos": avisos}
 
 
@@ -151,8 +162,13 @@ def _estimativa(plano: dict, chave: "str | None") -> str:
         n = plano["kie"]
         try:
             saldo = f"Seu saldo: {kie.creditos(chave):g} créditos."
-        except kie.KieErro as err:
-            saldo = f"Não consegui ver o saldo ({err})."
+        except Exception as err:  # noqa: BLE001 - o saldo é só informativo
+            try:
+                registrar_log(traceback.format_exc())
+            except Exception:  # noqa: BLE001
+                pass
+            saldo = "Não consegui ver o saldo agora." if not isinstance(err, kie.KieErro) else \
+                f"Não consegui ver o saldo ({err})."
         linhas.append(f"💳 Na KIE: até {n} gerações + {n} remoções de fundo (o que já foi gerado e não mudou "
                       f"não é cobrado de novo). {saldo}")
     return "\n".join(linhas)
@@ -176,8 +192,8 @@ def main(argv: "list[str] | None" = None) -> int:
     try:
         plano = planejar(projeto)
         chave = None if args.sem_kie else obter_chave("KIE_API_KEY")
+        print(_estimativa(plano, chave))
         if args.estimar:
-            print(_estimativa(plano, chave))
             return 0
         paleta_nome = ler_config(projeto / "pagina").get("paleta") or PALETA_PADRAO
         print("🎨 Gerando os mockups (com a KIE, 1–2 minutos por imagem)…")
