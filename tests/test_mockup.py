@@ -66,3 +66,128 @@ def test_capturar_jpeg_do_elemento(tmp_path):
     destino = tmp_path / "menor.jpg"
     _ou_pular(mockup.capturar, doc, destino, 400, 400, True, "#i")
     assert destino.read_bytes()[:3] == b"\xff\xd8\xff"
+
+
+import json
+
+from nucleo import kie
+
+
+class _Kie:
+    """Simula a KIE: registra chamadas; `falhar` = exceção a levantar em alguma etapa."""
+
+    def __init__(self, monkeypatch, falhar_em="", erro=None):
+        self.chamadas = []
+        self.falhar_em, self.erro = falhar_em, erro
+
+        def etapa(nome, retorno):
+            def f(*a, **k):
+                self.chamadas.append((nome, a, k))
+                if self.falhar_em == nome:
+                    raise self.erro
+                return retorno(*a, **k) if callable(retorno) else retorno
+            return f
+
+        def remover(chave, url, destino, limite=120):
+            destino.write_bytes(b"kie-png")
+            return destino
+
+        monkeypatch.setattr(mockup, "_reduzir", lambda origem, destino: destino.write_bytes(b"\xff\xd8\xff") and destino)
+        monkeypatch.setattr(kie, "enviar_arquivo", etapa("enviar", lambda chave, arq: f"https://f/{arq.name}"))
+        monkeypatch.setattr(kie, "gerar_imagem_url", etapa("gerar", "https://r/cena.png"))
+        monkeypatch.setattr(kie, "remover_fundo", etapa("remover", remover))
+
+    def nomes(self):
+        return [c[0] for c in self.chamadas]
+
+
+def _codigo_falso(monkeypatch):
+    feitos = []
+    monkeypatch.setattr(mockup, "via_codigo",
+                        lambda tipo, entradas, destino, paleta_nome: feitos.append(tipo) or destino.write_bytes(b"cod") or destino)
+    return feitos
+
+
+def test_kie_feliz(tmp_path, monkeypatch):
+    k = _Kie(monkeypatch)
+    _codigo_falso(monkeypatch)
+    capas = [_png_real(tmp_path, "p.png"), _png_real(tmp_path, "b1.png")]
+    r = mockup.gerar_mockup("pack", capas, tmp_path / "m" / "topo.png", "azul-laranja", chave="k")
+    assert r["modo"] == "kie" and r["aviso"] == "" and r["permanente"] is False
+    assert (tmp_path / "m" / "topo.png").read_bytes() == b"kie-png"
+    assert k.nomes() == ["enviar", "enviar", "gerar", "remover"]
+    gerar = k.chamadas[2]
+    assert gerar[2]["referencias"] == ["https://f/ref-0.jpg", "https://f/ref-1.jpg"]
+    assert "bonus" in gerar[1][1].lower()  # prompt do pack menciona os bônus
+    assert not (tmp_path / "m" / ".mockup-tmp").exists()
+
+
+@pytest.mark.parametrize("etapa", ["enviar", "gerar", "remover"])
+def test_falha_em_qualquer_etapa_cai_no_codigo(tmp_path, monkeypatch, etapa):
+    _Kie(monkeypatch, falhar_em=etapa, erro=kie.KieErro("A KIE está instável"))
+    feitos = _codigo_falso(monkeypatch)
+    r = mockup.gerar_mockup("livro", [_png_real(tmp_path)], tmp_path / "b.png", "azul-laranja", chave="k")
+    assert r["modo"] == "codigo" and "instável" in r["aviso"] and r["permanente"] is False
+    assert feitos == ["livro"]
+
+
+def test_erro_permanente_marca_permanente(tmp_path, monkeypatch):
+    _Kie(monkeypatch, falhar_em="gerar", erro=kie.KieErroPermanente("Seus créditos da KIE acabaram."))
+    _codigo_falso(monkeypatch)
+    r = mockup.gerar_mockup("livro", [_png_real(tmp_path)], tmp_path / "b.png", "azul-laranja", chave="k")
+    assert r["modo"] == "codigo" and r["permanente"] is True and "créditos" in r["aviso"]
+
+
+def test_erro_inesperado_vai_pro_log(tmp_path, monkeypatch, ambiente):
+    _Kie(monkeypatch, falhar_em="gerar", erro=RuntimeError("boom"))
+    _codigo_falso(monkeypatch)
+    r = mockup.gerar_mockup("livro", [_png_real(tmp_path)], tmp_path / "b.png", "azul-laranja", chave="k")
+    assert r["modo"] == "codigo" and "log" in r["aviso"]
+    assert "boom" in (ambiente / "home" / "log" / "maquina.log").read_text(encoding="utf-8")
+
+
+def test_sem_chave_e_pagina_sao_codigo(tmp_path, monkeypatch):
+    k = _Kie(monkeypatch)
+    feitos = _codigo_falso(monkeypatch)
+    capa = _png_real(tmp_path)
+    assert mockup.gerar_mockup("livro", [capa], tmp_path / "a.png", "azul-laranja")["modo"] == "codigo"
+    assert mockup.gerar_mockup("pagina", [capa], tmp_path / "p.png", "azul-laranja", chave="k")["modo"] == "codigo"
+    assert k.nomes() == [] and feitos == ["livro", "pagina"]
+
+
+def test_cache_evita_nova_chamada_e_refazer_ignora(tmp_path, monkeypatch):
+    k = _Kie(monkeypatch)
+    _codigo_falso(monkeypatch)
+    capa, destino = _png_real(tmp_path), tmp_path / "m" / "b.png"
+    assert mockup.gerar_mockup("livro", [capa], destino, "azul-laranja", chave="k")["modo"] == "kie"
+    assert mockup.gerar_mockup("livro", [capa], destino, "azul-laranja", chave="k")["modo"] == "cache"
+    assert json.loads((tmp_path / "m" / mockup.CACHE).read_text())["b.png"]["modo"] == "kie"
+    assert mockup.gerar_mockup("livro", [capa], destino, "azul-laranja", chave="k", refazer=True)["modo"] == "kie"
+    assert k.nomes().count("gerar") == 2
+
+
+def test_cache_invalida_se_capa_ou_paleta_muda(tmp_path, monkeypatch):
+    k = _Kie(monkeypatch)
+    _codigo_falso(monkeypatch)
+    capa, destino = _png_real(tmp_path), tmp_path / "b.png"
+    mockup.gerar_mockup("livro", [capa], destino, "azul-laranja", chave="k")
+    mockup.gerar_mockup("livro", [capa], destino, "preto-dourado", chave="k")
+    capa.write_bytes(capa.read_bytes() + b"\x00")
+    mockup.gerar_mockup("livro", [capa], destino, "preto-dourado", chave="k")
+    assert k.nomes().count("gerar") == 3
+
+
+def test_codigo_em_cache_e_refeito_quando_chega_a_chave(tmp_path, monkeypatch):
+    k = _Kie(monkeypatch)
+    _codigo_falso(monkeypatch)
+    capa, destino = _png_real(tmp_path), tmp_path / "b.png"
+    assert mockup.gerar_mockup("livro", [capa], destino, "azul-laranja")["modo"] == "codigo"
+    assert mockup.gerar_mockup("livro", [capa], destino, "azul-laranja")["modo"] == "cache"
+    assert mockup.gerar_mockup("livro", [capa], destino, "azul-laranja", chave="k")["modo"] == "kie"
+
+
+def test_entrada_inexistente_e_tipo_invalido(tmp_path):
+    with pytest.raises(ValueError, match="Não achei"):
+        mockup.gerar_mockup("livro", [tmp_path / "nada.png"], tmp_path / "b.png", "azul-laranja")
+    with pytest.raises(ValueError):
+        mockup.gerar_mockup("poster", [_png_real(tmp_path)], tmp_path / "b.png", "azul-laranja")
