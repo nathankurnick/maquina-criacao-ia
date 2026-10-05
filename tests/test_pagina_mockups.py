@@ -244,3 +244,37 @@ def test_estimar_mostra_avisos_de_entregavel(tmp_path, ambiente, capsys):
     out = capsys.readouterr().out
     assert "entregaveis/pack/capa.png" in out and 'bonus #2: "entregavel" inválido ("Guia Ruim")' in out
     assert out.count("Guia Ruim") == 1
+
+
+def test_cartoes_com_arte_geram_foto_na_kie(tmp_path, monkeypatch):
+    p = _projeto(tmp_path, bonus=0, fotos=0)
+    dados = json.loads((p / "pagina" / "conteudo.json").read_text(encoding="utf-8"))
+    dados["conteudo"] = {"itens": [{"titulo": "A", "arte": "a red trailer"}, {"titulo": "B"},
+                                   {"titulo": "C", "arte": "x", "imagem": "c.png"}]}
+    (p / "pagina" / "conteudo.json").write_text(json.dumps(dados), encoding="utf-8")
+    (p / "pagina" / "imagens" / "conteudo").mkdir(parents=True)
+    (p / "pagina" / "imagens" / "conteudo" / "c.png").write_bytes(b"c")
+    plano = pm.planejar(p)
+    assert [c["n"] for c in plano["cards"]] == [1]
+    monkeypatch.setattr(pm, "gerar_mockup", lambda tipo, entradas, destino, paleta_nome, chave=None, refazer=False:
+                        destino.write_bytes(b"m") and {"arquivo": destino, "modo": "kie", "aviso": "", "permanente": False})
+    chamadas = []
+    monkeypatch.setattr(pm.kie, "gerar_imagem", lambda chave, prompt, prop, destino, **kw:
+                        chamadas.append((prompt, prop)) or destino.write_bytes(b"f"))
+    r = pm.gerar(plano, "azul-laranja", "k")
+    assert len(chamadas) == 1 and chamadas[0][1] == "4:3" and chamadas[0][0].startswith("a red trailer")
+    assert ("conteudo-1.png", "kie") in r["modos"]
+    r2 = pm.gerar(pm.planejar(p), "azul-laranja", "k")
+    assert ("conteudo-1.png", "cache") in r2["modos"] and len(chamadas) == 1
+
+
+def test_cartoes_sem_chave_avisam(tmp_path, monkeypatch):
+    p = _projeto(tmp_path, bonus=0, fotos=0)
+    dados = json.loads((p / "pagina" / "conteudo.json").read_text(encoding="utf-8"))
+    dados["conteudo"] = {"itens": [{"titulo": "A", "arte": "x"}]}
+    (p / "pagina" / "conteudo.json").write_text(json.dumps(dados), encoding="utf-8")
+    monkeypatch.setattr(pm, "gerar_mockup", lambda tipo, entradas, destino, paleta_nome, chave=None, refazer=False:
+                        destino.write_bytes(b"m") and {"arquivo": destino, "modo": "codigo", "aviso": "", "permanente": False})
+    r = pm.gerar(pm.planejar(p), "azul-laranja", None)
+    assert any("sem a chave da KIE" in a for a in r["avisos"])
+    assert not (p / "pagina" / "imagens" / "mockups" / "conteudo-1.png").exists()

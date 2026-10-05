@@ -1,5 +1,6 @@
 # skills/02-pagina-de-vendas/scripts/pagina_mockups.py
-"""Gera os mockups da página em <P>/pagina/imagens/mockups/: topo (pack), um por bônus e as páginas do carrossel.
+"""Gera os mockups da página em <P>/pagina/imagens/mockups/: topo (pack), um por bônus, as páginas do carrossel
+e as fotos dos cartões de "O que você vai encontrar" que têm "arte" (só com a KIE).
 
 Uso: python pagina_mockups.py --projeto <P> [--pagina <pasta da página>] [--estimar] [--sem-kie] [--refazer]
 Com a chave da KIE, topo e bônus saem da KIE com fundo transparente; sem ela (ou se falhar), montados
@@ -98,8 +99,44 @@ def planejar(projeto: Path, pagina: "Path | None" = None) -> dict:
     paginas = (fotos_da_pasta(pagina / "imagens" / "carrossel")[:MAX_PAGINAS]
                if conteudo["carrossel"]["ativo"] else [])
     topo = {"ativo": hero["ativo"], "capa": principal, "nome": nome, "destino": saida / "topo.png"}
-    return {"saida": saida, "topo": topo, "bonus": bonus, "paginas": paginas, "avisos": avisos,
+    cards = []
+    if conteudo["conteudo"]["ativo"]:
+        for n, item in enumerate(conteudo["conteudo"]["itens"], 1):
+            propria = item["imagem"] and (pagina / "imagens" / "conteudo" / item["imagem"]).is_file()
+            if item["arte"] and not propria:
+                cards.append({"n": n, "arte": item["arte"], "destino": saida / f"conteudo-{n}.png"})
+    return {"saida": saida, "topo": topo, "bonus": bonus, "paginas": paginas, "cards": cards, "avisos": avisos,
             "kie": (1 if topo["ativo"] else 0) + len(bonus)}
+
+
+PROMPT_CARD = ("{arte}. Photorealistic, natural light, sharp focus, 4:3 landscape composition. "
+               "No text, no letters, no numbers, no logos, no watermarks.")
+
+
+def _gerar_cards(cards: list, chave: "str | None", refazer: bool) -> "tuple[list, list[str]]":
+    """Foto de cada cartão pela KIE. Sem chave, o cartão fica só com o ícone (não há versão por código)."""
+    modos, falhas = [], []
+    for c in cards:
+        destino = c["destino"]
+        marca = hashlib.sha256(PROMPT_CARD.format(arte=c["arte"]).encode()).hexdigest()
+        selo = destino.with_name(f".{destino.stem}.arte")
+        if not refazer and destino.exists() and selo.is_file() and selo.read_text(encoding="utf-8") == marca:
+            modos.append((destino.name, "cache"))
+            continue
+        if not chave:
+            falhas.append(f"cartão {c['n']}: sem a chave da KIE a foto não é gerada (fica só o ícone). "
+                          "Coloque uma foto em imagens/conteudo/ e o nome dela em \"imagem\".")
+            continue
+        try:
+            kie.gerar_imagem(chave, PROMPT_CARD.format(arte=c["arte"]), "4:3", destino)
+            selo.write_text(marca, encoding="utf-8")
+            modos.append((destino.name, "kie"))
+        except kie.KieErroPermanente as err:
+            falhas.append(f"cartão {c['n']}: {err}")
+            chave = None
+        except kie.KieErro as err:
+            falhas.append(f"cartão {c['n']}: {err}")
+    return modos, falhas
 
 
 def _capa_simples(pasta: Path, nome: str, titulo: str, rotulo: str, paleta_nome: str) -> Path:
@@ -114,7 +151,12 @@ def _capa_simples(pasta: Path, nome: str, titulo: str, rotulo: str, paleta_nome:
     return destino
 
 
-def _limpar_sobras(saida: Path, n_bonus: int, n_paginas: int, com_topo: bool) -> None:
+def _limpar_sobras(saida: Path, n_bonus: int, n_paginas: int, com_topo: bool, cards: "set[int] | None" = None) -> None:
+    for arq in saida.glob("conteudo-*.png"):
+        n = arq.stem.split("-")[1]
+        if not n.isdigit() or int(n) not in (cards or set()):
+            arq.unlink()
+            arq.with_name(f".{arq.stem}.arte").unlink(missing_ok=True)
     for arq in saida.glob("bonus-*.png"):
         if not arq.stem.split("-")[1].isdigit() or int(arq.stem.split("-")[1]) > n_bonus:
             arq.unlink()
@@ -156,13 +198,16 @@ def gerar(plano: dict, paleta_nome: str, chave: "str | None", refazer: bool = Fa
         um("livro", [capa], b["destino"])
     for k, foto in enumerate(plano["paginas"], 1):
         um("pagina", [foto], saida / f"pagina-{k:02d}.png")
-    _limpar_sobras(saida, len(plano["bonus"]), len(plano["paginas"]), plano["topo"]["ativo"])
+    modos_cards, falhas_cards = _gerar_cards(plano.get("cards", []), estado["chave"], refazer)
+    modos.extend(modos_cards)
+    _limpar_sobras(saida, len(plano["bonus"]), len(plano["paginas"]), plano["topo"]["ativo"],
+                   {c["n"] for c in plano.get("cards", [])})
     if capas.is_dir():
         em_uso = {c.resolve() for c in capas_bonus + [principal_usada] if c is not None}
         for velha in capas.glob("*.png"):
             if velha.resolve() not in em_uso:
                 velha.unlink()
-    avisos = []
+    avisos = list(falhas_cards)
     if contagem["codigo"] and falhas:
         avisos.append(f"⚠️ {contagem['codigo']} mockup(s) saíram no modo código porque a KIE falhou: {falhas[0]}")
     return {"modos": modos, "avisos": avisos}
@@ -176,10 +221,13 @@ def _estimativa(plano: dict, chave: "str | None") -> str:
         linhas.append(f"   • {len(plano['bonus'])} bônus (um mockup por bônus)")
     if plano["paginas"]:
         linhas.append(f"   • {len(plano['paginas'])} páginas do carrossel — montadas por código (grátis)")
+    if plano.get("cards"):
+        linhas.append(f"   • {len(plano['cards'])} fotos dos cartões de conteúdo (só com a KIE)")
     if not chave:
         linhas.append("💳 Sem a chave da KIE: tudo montado por código (grátis).")
     else:
         n = plano["kie"]
+        fotos = len(plano.get("cards", []))
         try:
             saldo = f"Seu saldo: {kie.creditos(chave):g} créditos."
         except Exception as err:  # noqa: BLE001 - o saldo é só informativo
@@ -189,7 +237,8 @@ def _estimativa(plano: dict, chave: "str | None") -> str:
                 pass
             saldo = "Não consegui ver o saldo agora." if not isinstance(err, kie.KieErro) else \
                 f"Não consegui ver o saldo ({err})."
-        linhas.append(f"💳 Na KIE: até {n} gerações + {n} remoções de fundo (o que já foi gerado e não mudou "
+        extra = f" + {fotos} fotos de cartão" if fotos else ""
+        linhas.append(f"💳 Na KIE: até {n} gerações + {n} remoções de fundo{extra} (o que já foi gerado e não mudou "
                       f"não é cobrado de novo). {saldo}")
     return "\n".join(linhas)
 

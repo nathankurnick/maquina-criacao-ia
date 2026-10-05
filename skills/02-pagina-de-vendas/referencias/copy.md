@@ -28,8 +28,8 @@ O `checkoutUrl` do exemplo está vazio de propósito: use o `link_checkout` real
     "titulo": "O que você vai encontrar",
     "subtitulo": "Tudo organizado do básico ao avançado.",
     "itens": [
-      { "icone": "livro", "titulo": "Receitas base", "descricao": "As 5 massas que resolvem tudo." },
-      { "icone": "relogio", "titulo": "Tempo de fermentação", "descricao": "Tabela pra cada clima." },
+      { "icone": "livro", "titulo": "Receitas base", "descricao": "As 5 massas que resolvem tudo.", "imagem": "massas.jpg" },
+      { "icone": "relogio", "titulo": "Tempo de fermentação", "descricao": "Tabela pra cada clima.", "arte": "Rustic homemade bread dough rising in a glass bowl on a wooden kitchen table" },
       { "icone": "lista", "titulo": "Lista de compras", "descricao": "O que comprar e onde." },
       { "icone": "ferramenta", "titulo": "Utensílios", "descricao": "O mínimo que você precisa." },
       { "icone": "estrela", "titulo": "Recheios", "descricao": "Doces e salgados." }
@@ -50,9 +50,9 @@ O `checkoutUrl` do exemplo está vazio de propósito: use o `link_checkout` real
     "titulo": "Como você recebe",
     "subtitulo": "Sem complicação.",
     "itens": [
-      { "titulo": "Acesso Imediato", "descricao": "Chega no seu e-mail logo após a compra." },
-      { "titulo": "Pagamento Único", "descricao": "Sem mensalidade." },
-      { "titulo": "Acesso Vitalício", "descricao": "Veja quando quiser." }
+      { "icone": "raio", "titulo": "Acesso Imediato", "descricao": "Chega no seu e-mail logo após a compra." },
+      { "icone": "cartao", "titulo": "Pagamento Único", "descricao": "Sem mensalidade." },
+      { "icone": "infinito", "titulo": "Acesso Vitalício", "descricao": "Veja quando quiser." }
     ]
   },
   "bonus": {
@@ -111,7 +111,14 @@ O `checkoutUrl` do exemplo está vazio de propósito: use o `link_checkout` real
 - `hero.headline`: a promessa central; marque 2 a 4 palavras decisivas com `**`.
 - `hero.cta` e todos os `cta`: CAIXA ALTA, até 5 palavras.
 - `conteudo.itens`: 5 itens; `icone` só uma destas: livro, busca, estrela, camera, etiqueta,
-  trofeu, ferramenta, lista, relogio, escudo, calculadora, documento.
+  trofeu, ferramenta, lista, relogio, escudo, calculadora, documento, raio, cartao, infinito,
+  mensagem, download, cadeado, presente, check.
+- Foto no cartão (opcional, deixa a seção bem mais bonita): `"imagem": "<arquivo>"` usa uma foto
+  que o aluno pôs em `pagina/imagens/conteudo/` (só o nome do arquivo: minúsculas, números e hífen,
+  .png/.jpg/.webp); ou `"arte": "<descrição em inglês da cena, sem texto>"` faz o `pagina_mockups.py`
+  gerar a foto na KIE (sem a chave, o cartão fica só com o ícone). `imagem` ganha da `arte`.
+  Ou todos os cartões têm foto, ou nenhum (misturar fica desigual).
+- `entrega.itens`: `icone` opcional (mesma lista); sem ele, vão raio, cartao e infinito, nessa ordem.
 - `incluso.itens`: 5 itens reforçando o `conteudo` com outras palavras.
 - `bonus.itens`: os bônus do oferta.md; `valor` é o valor de referência que o aluno confirmar.
 - `faq.itens`: 6 perguntas; pelo menos 3 respondem às objeções mais fortes do avatar.

@@ -55,7 +55,17 @@ ICONES = {
     "calculadora": ["M6 3h12v18H6z", "M9 7h6", "M9 11h.01", "M12 11h.01", "M15 11h.01",
                     "M9 15h.01", "M12 15h.01", "M15 15h.01", "M9 19h6"],
     "documento": ["M7 3h7l5 5v13H7z", "M14 3v5h5"],
+    "raio": ["M13 2 4 14h7l-1 8 9-12h-7z"],
+    "cartao": ["M3 6h18v12H3z", "M3 10h18", "M7 15h4"],
+    "infinito": ["M12 12c-2-2.7-3.6-4-5.5-4a4 4 0 0 0 0 8c1.9 0 3.5-1.3 5.5-4s3.6-4 5.5-4a4 4 0 0 1 0 8c-1.9 0-3.5-1.3-5.5-4z"],
+    "mensagem": ["M4 5h16v11H9l-5 4z"],
+    "download": ["M12 4v11", "M7 10l5 5 5-5", "M5 20h14"],
+    "cadeado": ["M6 11h12v10H6z", "M8.5 11V8a3.5 3.5 0 0 1 7 0v3"],
+    "check": ["M5 12.5l4.5 4.5L19 7"],
+    "presente": ["M4 11h16v10H4z", "M3 7h18v4H3z", "M12 7v14", "M12 7c-1.5-3-5-3-5-1s3 1 5 1c2 0 5 1 5-1s-3.5-2-5 1"],
 }
+# Ícones dos cartões de "Como você recebe" quando a copy não diz qual (pela ordem).
+ICONES_ENTREGA = ("raio", "cartao", "infinito")
 ICONE_PADRAO = "estrela"
 
 CONFIG_PADRAO = {
@@ -89,6 +99,23 @@ def _slug(v, avisos: "list[str] | None" = None, onde: str = "") -> str:
     if t and avisos is not None:
         avisos.append(f'{onde}: "entregavel" inválido ("{t}") — use o nome da pasta em entregaveis/ '
                       "(só minúsculas, números e hífen).")
+    return ""
+
+
+def _nome_icone(v, padrao: str) -> str:
+    return v if isinstance(v, str) and v in ICONES else padrao
+
+
+_IMAGEM = re.compile(r"[a-z0-9]+(?:[-_][a-z0-9]+)*\.(?:png|jpe?g|webp)")
+
+
+def _arquivo_imagem(v, avisos: "list[str]") -> str:
+    """Nome de um arquivo em imagens/conteudo/ (sem pastas): só minúsculas, números, hífen e a extensão."""
+    t = _texto(v)
+    if not t or _IMAGEM.fullmatch(t):
+        return t
+    avisos.append(f'conteudo: "imagem" inválida ("{t}") — use só o nome do arquivo em imagens/conteudo/ '
+                  "(minúsculas, números e hífen, terminando em .png, .jpg ou .webp).")
     return ""
 
 
@@ -173,10 +200,16 @@ def normalizar(bruto: object) -> "tuple[dict, list[str]]":
 
     para_quem = com_itens("paraQuem", ("titulo", "subtitulo"), _titulo_descricao)
     conteudo = com_itens("conteudo", ("titulo", "subtitulo"), lambda x: {
-        "icone": (i if isinstance(i := _objeto(x).get("icone"), str) and i in ICONES else ICONE_PADRAO),
+        "icone": _nome_icone(_objeto(x).get("icone"), ICONE_PADRAO),
+        "imagem": _arquivo_imagem(_objeto(x).get("imagem"), avisos),
+        "arte": _texto(_objeto(x).get("arte")),
         **_titulo_descricao(x)})
     incluso = com_itens("incluso", ("titulo", "nota"), _titulo_descricao)
-    entrega = com_itens("entrega", ("titulo", "subtitulo"), _titulo_descricao)
+    entrega = com_itens("entrega", ("titulo", "subtitulo"), lambda x: {
+        "icone": _nome_icone(_objeto(x).get("icone"), ""), **_titulo_descricao(x)})
+    for n, item in enumerate(entrega["itens"]):
+        if not item["icone"]:
+            item["icone"] = ICONES_ENTREGA[n % len(ICONES_ENTREGA)]
     n_bonus = [0]
 
     def item_bonus(x):

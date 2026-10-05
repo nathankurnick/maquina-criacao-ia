@@ -89,6 +89,9 @@ Pastas que o aluno pode preencher:
   2 páginas mais visuais de cada entregável; o aluno pode trocar ou acrescentar (máx. 6 aparecem).
 - `<P>/pagina/imagens/depoimentos/` — **só prints de depoimentos reais**. Sem imagens, a seção
   fica escondida.
+- `<P>/pagina/imagens/conteudo/` — fotos dos cartões de "O que você vai encontrar" (o nome do
+  arquivo vai em `conteudo.itens[].imagem`). Cartão com `arte` e sem foto própria ganha uma foto
+  gerada na KIE pelo `pagina_mockups.py` (entra na estimativa).
 
 Ligue a copy aos entregáveis do Sistema 03 (pastas em `<P>/entregaveis/`): no `conteudo.json`, ponha
 `"entregavel": "<pasta do produto principal>"` em `hero` e `"entregavel": "<pasta do bônus>"` em cada

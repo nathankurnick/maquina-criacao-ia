@@ -56,9 +56,18 @@ def com_destaque(texto: str) -> str:
     return "".join(saida)
 
 
-def _icone(nome: str) -> str:
+# Fontes embutidas no site (licença OFL, em template/fontes/): nada de servidor de terceiros.
+FONTES_DIR = CSS.parent / "fontes"
+FONTES = ('<link rel="preload" href="fontes/archivo.woff2" as="font" type="font/woff2" crossorigin>\n'
+          "<style>@font-face{font-family:Archivo;src:url(fontes/archivo.woff2) format('woff2');"
+          "font-weight:100 900;font-stretch:62% 125%;font-display:swap}"
+          "@font-face{font-family:Manrope;src:url(fontes/manrope.woff2) format('woff2');"
+          "font-weight:200 800;font-display:swap}</style>\n")
+
+
+def _icone(nome: str, classe: str = "icone") -> str:
     caminhos = "".join(f'<path d="{d}"/>' for d in ICONES.get(nome, ICONES["estrela"]))
-    return ('<svg class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" '
+    return (f'<svg class="{classe}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" '
             f'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{caminhos}</svg>')
 
 
@@ -167,29 +176,39 @@ def _para_quem(b, href):
                             f'<div class="centro">{_cta(href, "QUERO ACESSAR AGORA")}</div></div>')
 
 
-def _conteudo(b):
+def _conteudo(b, fotos=None, tamanhos=None):
     if not b["ativo"]:
         return ""
-    cartoes = "".join(f'<div class="cartao cartao-vidro">{_icone(i["icone"])}<h3>{e(i["titulo"])}</h3>'
-                      f'<p class="desc">{e(i["descricao"])}</p></div>' for i in b["itens"])
-    return _secao("media", f'<div class="caixa">{_cabeca(b)}<div class="grade grade-2 grade-3l">{cartoes}</div></div>')
+    cartoes = []
+    for n, i in enumerate(b["itens"], 1):
+        src = (fotos or {}).get(n, "")
+        texto = f'{_icone(i["icone"])}<h3>{e(i["titulo"])}</h3><p class="desc">{e(i["descricao"])}</p>'
+        if src:
+            cartoes.append(f'<div class="cartao cartao-vidro cartao-foto"><div class="foto"><img src="{e(src)}" '
+                           f'alt="{e(i["titulo"])}"{_tam(src, tamanhos or {})} loading="lazy"></div>'
+                           f'<div class="corpo">{texto}</div></div>')
+        else:
+            cartoes.append(f'<div class="cartao cartao-vidro">{texto}</div>')
+    grade = "grade grade-2 grade-3l grade-fotos" if fotos else "grade grade-2 grade-3l"
+    return _secao("media", f'<div class="caixa">{_cabeca(b)}<div class="{grade}">{"".join(cartoes)}</div></div>')
 
 
 def _incluso(b):
     if not b["ativo"]:
         return ""
-    itens = "".join(f'<li><span class="check" aria-hidden="true">✓</span><div><p class="item-titulo">'
-                    f'{e(i["titulo"])}</p><p class="desc">{e(i["descricao"])}</p></div></li>' for i in b["itens"])
-    nota = f'<p class="nota">{e(b["nota"])}</p>' if b["nota"] else ""
-    return _secao("clara borda-topo", f'<div class="caixa caixa-media"><h2>{e(b["titulo"])}</h2>'
-                                      f'<ul class="lista-check">{itens}</ul>{nota}</div>')
+    itens = "".join(f'<li><span class="check" aria-hidden="true">{_icone("check", "icone-check")}</span><div>'
+                    f'<p class="item-titulo">{e(i["titulo"])}</p><p class="desc">{e(i["descricao"])}</p></div></li>'
+                    for i in b["itens"])
+    nota = f'<p class="ficha-nota">{e(b["nota"])}</p>' if b["nota"] else ""
+    return _secao("clara borda-topo incluso", f'<div class="caixa caixa-media"><h2>{e(b["titulo"])}</h2>'
+                                              f'<div class="ficha"><ul class="lista-check">{itens}</ul>{nota}</div></div>')
 
 
 def _entrega(b):
     if not b["ativo"]:
         return ""
-    cartoes = "".join(f'<div class="cartao cartao-borda"><h3>{e(i["titulo"])}</h3>'
-                      f'<p class="desc">{e(i["descricao"])}</p></div>' for i in b["itens"])
+    cartoes = "".join(f'<div class="cartao cartao-borda"><span class="selo-icone">{_icone(i["icone"])}</span>'
+                      f'<h3>{e(i["titulo"])}</h3><p class="desc">{e(i["descricao"])}</p></div>' for i in b["itens"])
     return _secao("branca", f'<div class="caixa caixa-media">{_cabeca(b)}<div class="grade grade-3">{cartoes}</div></div>')
 
 
@@ -202,7 +221,8 @@ def _bonus(b, mockups=None, tamanhos=None):
         img = (f'<img class="bonus-mockup" src="{e(src)}" alt="Bônus #{n}: {e(i["titulo"])}" loading="lazy"'
                f'{_tam(src, tamanhos or {})}>' if src else "")
         valor = (f'<p class="valor"><s>{e(i["valor"])}</s> <strong>GRÁTIS</strong></p>' if i["valor"] else "")
-        cartoes.append(f'<div class="cartao cartao-vidro">{img}<p class="rotulo">Bônus #{n}</p><h3>{e(i["titulo"])}</h3>'
+        img = f'<div class="vitrine">{img}</div>' if img else ""
+        cartoes.append(f'<div class="cartao cartao-vidro cartao-bonus">{img}<p class="rotulo">Bônus #{n}</p><h3>{e(i["titulo"])}</h3>'
                        f'<p class="desc">{e(i["descricao"])}</p>{valor}</div>')
     return _secao("escura", f'<div class="caixa">{_cabeca(b)}<div class="grade grade-2 grade-3l">{"".join(cartoes)}</div></div>')
 
@@ -216,22 +236,24 @@ def _depoimentos(b, imagens, tamanhos=None):
     return _secao("clara", f'<div class="caixa">{_cabeca(b)}<div class="grade grade-2 grade-3l depoimentos">{fotos}</div></div>')
 
 
-def _cartao_plano(p):
+def _cartao_plano(p, mockup="", tamanhos=None):
     if not p["ativo"]:
         return ""
+    foto = (f'<img class="plano-mockup" src="{e(mockup)}" alt="{e(p["nome"])}"{_tam(mockup, tamanhos or {})} '
+            'loading="lazy">' if mockup else "")
     selo = '<span class="selo">MAIS VENDIDO</span>' if p["destaque"] else ""
     itens = "".join(f'<li><span class="check" aria-hidden="true">✓</span>{e(i)}</li>' for i in p["itens"])
     de = f'<p class="preco-de">{e(p["precoDe"])}</p>' if p["precoDe"] else ""
     classe = "plano em-destaque" if p["destaque"] else "plano"
-    return (f'<div class="{classe}">{selo}<h3>{e(p["nome"])}</h3><ul>{itens}</ul>'
+    return (f'<div class="{classe}">{selo}{foto}<h3>{e(p["nome"])}</h3><ul>{itens}</ul>'
             f'<div class="precos">{de}<p class="preco-por">{e(p["precoPor"])}</p></div>'
             f'{_cta(p["checkoutUrl"], p["cta"])}</div>')
 
 
-def _planos(b):
+def _planos(b, mockup="", tamanhos=None):
     if not b["ativo"]:
         return ""
-    cartoes = _cartao_plano(b["basico"]) + _cartao_plano(b["premium"])
+    cartoes = _cartao_plano(b["basico"], mockup, tamanhos) + _cartao_plano(b["premium"])
     ativos = sum(1 for p in (b["basico"], b["premium"]) if p["ativo"])
     grade = "grade grade-2" if ativos > 1 else "grade grade-1"
     return _secao("clara borda-topo planos", f'<div class="caixa caixa-media">{_cabeca(b)}'
@@ -241,7 +263,7 @@ def _planos(b):
 def _garantia(b, href):
     if not b["ativo"]:
         return ""
-    return _secao("branca", f'<div class="garantia-caixa"><p class="rotulo">{e(b["titulo"])}</p>'
+    return _secao("branca", f'<div class="garantia-caixa"><span class="selo-icone">{_icone("escudo")}</span><p class="rotulo">{e(b["titulo"])}</p>'
                             f'<p class="garantia-dias">{b["dias"]} DIAS PARA TESTAR</p>'
                             f'<p class="garantia-texto">{e(b["texto"])}</p>{_cta(href, b["cta"])}</div>')
 
@@ -297,12 +319,12 @@ def render_html(conteudo: dict, config: dict, imagens: dict, ano: int) -> str:
         _carrossel(conteudo["carrossel"], imagens.get("carrossel", []), imagens.get("carrossel_mockup", False),
                    tamanhos),
         _para_quem(conteudo["paraQuem"], href),
-        _conteudo(conteudo["conteudo"]),
+        _conteudo(conteudo["conteudo"], imagens.get("conteudo", {}), tamanhos),
         _incluso(conteudo["incluso"]),
         _entrega(conteudo["entrega"]),
         _bonus(conteudo["bonus"], imagens.get("bonus", {}), tamanhos),
         _depoimentos(conteudo["depoimentos"], imagens.get("depoimentos", []), tamanhos),
-        _planos(planos),
+        _planos(planos, imagens.get("topo", ""), tamanhos),
         _garantia(conteudo["garantia"], href),
         _faq(conteudo["faq"]),
         _rodape(conteudo["rodape"], ano),
@@ -315,7 +337,7 @@ def render_html(conteudo: dict, config: dict, imagens: dict, ano: int) -> str:
         f'<meta property="og:title" content="{e(titulo)}">\n'
         f'<meta property="og:description" content="{e(descricao)}">\n'
         '<meta property="og:type" content="website">\n'
-        f"<style>{variaveis}\n{CSS.read_text(encoding='utf-8')}</style>\n"
+        f"{FONTES}<style>{variaveis}\n{CSS.read_text(encoding='utf-8')}</style>\n"
         f"{_pixels(config.get('pixel_meta', ''), config.get('pixel_google', ''))}"
         f"{config.get('head_html', '')}\n</head>\n<body>\n{corpo}</body>\n</html>\n"
     )
@@ -361,8 +383,8 @@ def _relativa(pasta_projeto, pagina) -> str:
 
 def _montar(pagina, conteudo, config, avisos, site, novo, rel="pagina"):
 
-    imagens = {"logo": "", "carrossel": [], "depoimentos": [], "topo": "", "bonus": {}, "tamanhos": {},
-               "carrossel_mockup": False}
+    imagens = {"logo": "", "carrossel": [], "depoimentos": [], "topo": "", "bonus": {}, "conteudo": {},
+               "tamanhos": {}, "carrossel_mockup": False}
     logos = [p for p in sorted((pagina / "imagens").iterdir())
              if p.is_file() and p.stem.lower() == "logo" and p.suffix.lower() in EXT_LOGO] \
         if (pagina / "imagens").is_dir() else []
@@ -390,6 +412,17 @@ def _montar(pagina, conteudo, config, avisos, site, novo, rel="pagina"):
         for n in range(1, len(conteudo["bonus"]["itens"]) + 1):
             if (mockups / f"bonus-{n}.png").is_file():
                 imagens["bonus"][n] = copiar(mockups / f"bonus-{n}.png", f"mockup-bonus-{n}.png")
+    if conteudo["conteudo"]["ativo"]:
+        pasta_cards = pagina / "imagens" / "conteudo"
+        for n, item in enumerate(conteudo["conteudo"]["itens"], 1):
+            propria = pasta_cards / item["imagem"] if item["imagem"] else None
+            if propria is not None and propria.is_file():
+                imagens["conteudo"][n] = copiar(propria, f"conteudo-{n:02d}{propria.suffix.lower()}")
+            elif (mockups / f"conteudo-{n}.png").is_file():
+                imagens["conteudo"][n] = copiar(mockups / f"conteudo-{n}.png", f"conteudo-{n:02d}.png")
+            if propria is not None and not propria.is_file():
+                avisos.append(f'conteudo: não achei {rel}/imagens/conteudo/{item["imagem"]} — o cartão '
+                              f'"{item["titulo"]}" ficou sem imagem.')
     brutas = fotos_da_pasta(pagina / "imagens" / "carrossel")
     paginas = sorted(mockups.glob("pagina-[0-9][0-9].png")) if mockups.is_dir() and conteudo["carrossel"]["ativo"] else []
     if paginas:
@@ -410,6 +443,10 @@ def _montar(pagina, conteudo, config, avisos, site, novo, rel="pagina"):
     if conteudo["carrossel"]["ativo"] and not imagens["carrossel"]:
         avisos.append(f"carrossel: sem imagens em {rel}/imagens/carrossel/ — a seção fica escondida.")
 
+    if FONTES_DIR.is_dir():
+        (novo / "fontes").mkdir()
+        for fonte in FONTES_DIR.glob("*.woff2"):
+            shutil.copyfile(fonte, novo / "fontes" / fonte.name)
     index = novo / "index.html"
     index.write_text(render_html(conteudo, config, imagens, date.today().year), encoding="utf-8")
     antigo = pagina / ".site-antigo"

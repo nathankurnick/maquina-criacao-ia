@@ -29,7 +29,7 @@ def test_paletas_e_icones():
     assert pc.PALETAS["azul-laranja"] == {
         "fundo": "#0a1628", "fundo-claro": "#eef3fb", "fundo-medio": "#0f3460", "destaque": "#f59e0b",
         "cta": "#f59e0b", "cta-texto": "#0a1628", "texto-claro": "#ffffff", "texto-escuro": "#0a1628"}
-    assert len(pc.ICONES) == 12 and "estrela" in pc.ICONES
+    assert len(pc.ICONES) == 20 and "estrela" in pc.ICONES and set(pc.ICONES_ENTREGA) <= set(pc.ICONES)
     assert set(pc.PALETAS_ROTULO) == set(pc.PALETAS)
 
 

@@ -507,3 +507,53 @@ def test_depoimento_nao_distorce_no_celular(tmp_path):
             pytest.skip("Chromium do Playwright não instalado")
         raise
     assert caixa[0] > 0 and abs(caixa[1] / caixa[0] - 2.0) < 0.05
+
+
+def test_fontes_e_icones_da_entrega_e_garantia():
+    h = _html()
+    assert "url(fontes/archivo.woff2)" in h and "googleapis" not in h
+    entrega = h.split("Acesso Imediato")[0].rsplit('class="cartao cartao-borda"', 1)[1]
+    assert 'class="selo-icone"' in entrega and pc.ICONES["raio"][0] in entrega
+    c = _conteudo(entrega={"itens": [{"titulo": "A", "icone": "mensagem"}, {"titulo": "B"}, {"titulo": "C", "icone": "xx"}]})
+    assert [i["icone"] for i in c["entrega"]["itens"]] == ["mensagem", "cartao", "infinito"]
+    assert 'class="garantia-caixa"><span class="selo-icone">' in _html()
+
+
+def test_conteudo_com_foto_e_plano_com_mockup():
+    c = _conteudo()
+    h = _html(conteudo=c, imagens={"logo": "", "carrossel": [], "depoimentos": [], "topo": "img/mockup-topo.png",
+                                  "conteudo": {1: "img/conteudo-01.png"}})
+    assert 'class="cartao cartao-vidro cartao-foto"><div class="foto"><img src="img/conteudo-01.png" alt="Receitas"' in h
+    assert "grade-fotos" in h
+    assert '<img class="plano-mockup" src="img/mockup-topo.png"' in h
+    assert '<img class="plano-mockup"' not in _html()
+    assert "cartao cartao-vidro cartao-foto" not in _html()
+
+
+def test_incluso_vira_ficha():
+    h = _html()
+    assert '<div class="ficha"><ul class="lista-check">' in h and 'class="ficha-nota">Nota honesta' in h
+
+
+def test_imagem_do_cartao_invalida_avisa():
+    c, avisos = pc.normalizar({"conteudo": {"itens": [{"titulo": "A", "imagem": "../x.png"},
+                                                      {"titulo": "B", "imagem": "foto-b.jpg"}]}})
+    assert [i["imagem"] for i in c["conteudo"]["itens"]] == ["", "foto-b.jpg"]
+    assert any('"imagem" inválida' in a for a in avisos)
+
+
+def test_montar_site_fotos_dos_cartoes(tmp_path):
+    p = _projeto(tmp_path, {"hero": {"headline": "Oi"}, "rodape": {"nomeProduto": "X"},
+                            "planos": {"basico": {"checkoutUrl": "https://c.com", "precoPor": "R$ 9"}},
+                            "conteudo": {"itens": [{"titulo": "A", "imagem": "a.jpg"}, {"titulo": "B"},
+                                                   {"titulo": "C", "imagem": "falta.png"}]}})
+    img = p / "pagina" / "imagens"
+    (img / "conteudo").mkdir(parents=True)
+    (img / "conteudo" / "a.jpg").write_bytes(b"jpg")
+    (img / "mockups").mkdir()
+    (img / "mockups" / "conteudo-2.png").write_bytes(b"png")
+    index, avisos = pr.montar_site(p)
+    nomes = sorted(x.name for x in (index.parent / "img").iterdir())
+    assert nomes == ["conteudo-01.jpg", "conteudo-02.png"]
+    assert sorted(x.name for x in (index.parent / "fontes").iterdir()) == ["archivo.woff2", "manrope.woff2"]
+    assert any("falta.png" in a for a in avisos)
